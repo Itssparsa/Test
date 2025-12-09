@@ -1,32 +1,102 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Existential Toaster</title>
     <style>
+        /* --- Main Layout --- */
         body {
             background-color: #f0f8ff;
-            font-family: 'Courier New', Courier, monospace;
+            /* Using a fun, slightly messy font for the notes, falling back to monospace */
+            font-family: 'Comic Sans MS', 'Chalkboard SE', 'Courier New', monospace;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 1;
+            min-height: 100vh;
+            margin: 0;
             overflow: hidden;
+            position: relative;
         }
 
         h1 {
             color: #333;
-            margin-bottom: 50px;
+            margin-top: 30px;
+            margin-bottom: 20px;
+            font-family: 'Courier New', Courier, monospace;
+            z-index: 10;
         }
 
-        /* The Toaster Container */
+        /* --- Sticky Notes --- */
+        .sticky-note {
+            position: absolute;
+            background-color: #fff740; /* Bright yellow post-it color */
+            padding: 15px;
+            width: 130px;
+            box-shadow: 4px 4px 10px rgba(0,0,0,0.2);
+            font-size: 14px;
+            text-align: center;
+            border-bottom-right-radius: 20px 5px; /* Slight curl effect */
+            z-index: 5;
+        }
+
+        .note-left {
+            top: 200px;
+            left: 10%;
+            transform: rotate(-12deg);
+        }
+
+        .note-right {
+            top: 220px;
+            right: 10%;
+            transform: rotate(8deg);
+        }
+
+        .note-bottom {
+            bottom: 150px;
+            right: 20%;
+            transform: rotate(-5deg);
+            z-index: 10; /* sits on top of text bubble area */
+        }
+        
+        .skull-icon { font-size: 24px; display: block; margin-bottom: 5px;}
+
+
+        /* --- The Toaster Section --- */
         .toaster-container {
             position: relative;
             width: 300px;
             height: 200px;
+            /* Moved down so it doesn't cover the title */
+            margin-top: 100px; 
+            z-index: 6;
         }
+
+        /* Lightning Bolts (Hidden by default) */
+        .lightning {
+            position: absolute;
+            font-size: 60px;
+            color: #FFD700; /* Gold/Yellow */
+            opacity: 0;
+            z-index: 4;
+            transition: opacity 0.1s ease-in-out;
+            text-shadow: 0 0 10px #FFA500;
+        }
+        .bolt-1 { top: -80px; left: 40px; transform: rotate(-30deg); }
+        .bolt-2 { top: -100px; left: 120px; transform: rotate(10deg); }
+        .bolt-3 { top: -80px; right: 40px; transform: rotate(30deg); }
+
+        /* Class added via JS to trigger the flash */
+        .zap-active {
+            opacity: 1;
+            animation: flash 0.5s linear infinite alternate;
+        }
+
+        @keyframes flash {
+            0% { opacity: 0.6; transform: scale(1); }
+            100% { opacity: 1; transform: scale(1.2); }
+        }
+
 
         /* The Toast (Hidden at first) */
         .toast {
@@ -39,7 +109,7 @@
             left: 70px;
             top: 60px; /* Starting position inside toaster */
             transition: top 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            z-index: 1;
+            z-index: 3;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -53,6 +123,7 @@
             font-size: 24px;
             font-weight: bold;
             color: #5a2d0c;
+            font-family: monospace;
         }
 
         /* The Toaster Body */
@@ -60,12 +131,11 @@
             position: absolute;
             width: 300px;
             height: 180px;
-            background-color: #silver;
             background: linear-gradient(135deg, #e0e0e0 0%, #c0c0c0 100%);
-            border: 4px solid #666;
+            border: 4px solid #555;
             border-radius: 30px;
             bottom: 0;
-            z-index: 2;
+            z-index: 5;
             box-shadow: 10px 10px 0px rgba(0,0,0,0.1);
         }
 
@@ -77,8 +147,9 @@
             transform: translateX(-50%);
             width: 200px;
             height: 15px;
-            background-color: #333;
+            background-color: #222;
             border-radius: 10px;
+            border-bottom: 2px solid #777;
         }
 
         /* The Handle */
@@ -88,9 +159,9 @@
             top: 40px;
             width: 15px;
             height: 80px;
-            background-color: #999;
+            background-color: #888;
             border-radius: 5px;
-            z-index: 1;
+            z-index: 4;
         }
 
         .handle-knob {
@@ -103,27 +174,31 @@
             border-radius: 5px;
             cursor: pointer;
             transition: top 0.3s;
-            z-index: 3;
+            z-index: 6;
         }
 
-        .handle-knob:active {
-            background-color: #000;
-        }
+        .handle-knob:active { background-color: #000; }
 
+        /* --- Controls & Text --- */
         /* The Wisdom Text Bubble */
         #wisdom-display {
-            margin-top: 50px;
+            margin-top: 60px;
             background: white;
-            border: 2px solid #333;
-            padding: 20px;
-            border-radius: 15px;
+            border: 3px solid #333;
+            padding: 25px;
+            border-radius: 20px;
             max-width: 400px;
             min-height: 50px;
             text-align: center;
-            box-shadow: 5px 5px 0px #333;
+            box-shadow: 8px 8px 0px #333;
             opacity: 0;
             transform: translateY(20px);
             transition: all 0.5s ease;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 18px;
+            font-weight: bold;
+            z-index: 8;
+            position: relative;
         }
 
         .visible {
@@ -131,26 +206,28 @@
             transform: translateY(0) !important;
         }
 
-        /* Animation State */
-        .popped {
-            top: -80px; /* Toast goes up */
-        }
-        
-        .knob-down {
-            top: 100px; /* Handle goes down */
-        }
+        /* Animation States */
+        .popped { top: -80px; } /* Toast goes up */
+        .knob-down { top: 100px; } /* Handle goes down */
 
         button {
-            margin-top: 30px;
-            padding: 10px 20px;
-            font-size: 16px;
-            font-family: inherit;
+            margin-top: 40px;
+            padding: 12px 25px;
+            font-size: 18px;
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
             background: #ff6b6b;
             color: white;
-            border: none;
-            border-radius: 5px;
+            border: 3px solid #c94545;
+            border-radius: 8px;
             cursor: pointer;
             display: none; /* Hidden until needed */
+            box-shadow: 4px 4px 0px #c94545;
+            z-index: 10;
+        }
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px #c94545;
         }
 
     </style>
@@ -159,7 +236,23 @@
 
     <h1>The Existential Toaster</h1>
 
+    <div class="sticky-note note-left">
+        ZAP! Now I'm "Current"ly Toast!
+    </div>
+    <div class="sticky-note note-right">
+        <span class="skull-icon">☠️🍞</span>
+        Warning: High Voltage Breakfast!
+    </div>
+    <div class="sticky-note note-bottom">
+        Don't be shocked by my crispiness!
+    </div>
+
+
     <div class="toaster-container">
+        <div class="lightning bolt-1">⚡</div>
+        <div class="lightning bolt-2">⚡</div>
+        <div class="lightning bolt-3">⚡</div>
+
         <div class="toast" id="toast">
             <div class="toast-face">o_o</div>
         </div>
@@ -181,6 +274,7 @@
         const display = document.getElementById('wisdom-display');
         const resetBtn = document.getElementById('reset-btn');
         const face = document.querySelector('.toast-face');
+        const lightningBolts = document.querySelectorAll('.lightning');
 
         const quotes = [
             "I used to be dough. I had dreams. Now I am just crunchy.",
@@ -197,7 +291,7 @@
             "Do not drop me butter-side down. I have dignity."
         ];
 
-        const faces = ["O_O", ">_<", "-_-", "^_^", "T_T", "x_x", "o_0"];
+        const faces = ["O_O", ">_<", "-_-", "^_^", "T_T", "x_x", "o_0", "⊙_⊙"];
 
         let isToasting = false;
 
@@ -209,11 +303,14 @@
             handle.classList.add('knob-down');
             display.classList.remove('visible');
             
-            // 2. Wait a moment, then POP
+            // 2. Wait a moment for "toasting"
             setTimeout(() => {
-                // Pop the toast
+                // POP!
                 toast.classList.add('popped');
                 
+                // Activate Lightning!
+                lightningBolts.forEach(bolt => bolt.classList.add('zap-active'));
+
                 // Randomize Content
                 const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
                 const randomFace = faces[Math.floor(Math.random() * faces.length)];
@@ -235,6 +332,8 @@
             display.classList.remove('visible');
             resetBtn.style.display = 'none';
             face.innerText = "o_o";
+            // Turn off lightning
+            lightningBolts.forEach(bolt => bolt.classList.remove('zap-active'));
         }
     </script>
 </body>
