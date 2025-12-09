@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>The Ultimate Chaos Toaster</title>
     <style>
         /* --- Main Layout --- */
@@ -12,43 +12,50 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: center; /* Centers vertically */
             min-height: 100vh;
             margin: 0;
-            overflow: hidden;
+            overflow-x: hidden; /* Prevent side scrolling */
             user-select: none;
+            padding: 20px;
+            box-sizing: border-box;
         }
 
         h1 {
             color: #333;
-            margin-top: 20px;
+            margin-top: 0;
+            margin-bottom: 60px; /* More space between title and toaster */
             z-index: 10;
             text-align: center;
+            font-size: 2rem;
         }
 
-        /* --- Sticky Notes (Decorations) --- */
+        /* --- Sticky Notes (Responsive Positions) --- */
         .sticky-note {
             position: absolute;
             background-color: #fff740;
             padding: 15px;
-            width: 120px;
+            width: 100px;
             box-shadow: 3px 3px 8px rgba(0,0,0,0.2);
             font-family: 'Comic Sans MS', cursive, sans-serif;
-            font-size: 13px;
+            font-size: 12px;
             text-align: center;
             z-index: 2;
+            pointer-events: none; /* Let clicks pass through to background */
         }
 
-        .note-1 { top: 140px; left: 8%; transform: rotate(-12deg); }
-        .note-2 { top: 170px; right: 8%; transform: rotate(10deg); background-color: #ff99cc; }
-        .note-3 { bottom: 120px; left: 15%; transform: rotate(5deg); background-color: #a8e6cf; z-index: 12;}
+        /* Positioned relative to viewport width/height */
+        .note-1 { top: 15%; left: 5%; transform: rotate(-12deg); }
+        .note-2 { top: 18%; right: 5%; transform: rotate(10deg); background-color: #ff99cc; }
+        .note-3 { bottom: 10%; left: 10%; transform: rotate(5deg); background-color: #a8e6cf; z-index: 12;}
         
         /* --- The Toaster Rig --- */
         .toaster-container {
             position: relative;
             width: 320px;
             height: 240px;
-            margin-top: 60px; 
             z-index: 5;
+            /* No fixed margin-top, we use Flexbox to center it now */
         }
         
         /* The container shakes when stuck */
@@ -61,9 +68,7 @@
             100% { transform: translate(1px, -1px) rotate(0deg); }
         }
 
-
         /* --- EFFECTS LAYER --- */
-        /* Lightning */
         .lightning {
             position: absolute;
             font-size: 60px;
@@ -78,7 +83,6 @@
         .zap-active { animation: flash 0.1s linear infinite alternate; opacity: 1; }
         @keyframes flash { from { opacity: 0; } to { opacity: 1; } }
 
-        /* Smoke */
         .smoke-particle {
             position: absolute;
             background: #555;
@@ -92,7 +96,6 @@
             100% { transform: translateY(-100px) scale(3); opacity: 0; }
         }
 
-        /* Holy Glow */
         .glow-bg {
             position: absolute;
             width: 300px;
@@ -110,7 +113,7 @@
             position: absolute;
             width: 160px;
             height: 140px;
-            background-color: #f4a460; /* Starting Dough Color */
+            background-color: #f4a460;
             border: 4px solid #8b4513;
             border-radius: 15px 15px 5px 5px;
             left: 80px;
@@ -131,33 +134,25 @@
 
         /* SCENARIO STYLES */
         .toast.normal { background-color: #ffc87c; border-color: #c98a45; }
-        
         .toast.burnt { background-color: #333; border-color: #000; }
         .toast.burnt .toast-face { color: #fff; }
-
         .toast.raw { background-color: #fdf5e6; border-color: #e0d5c0; }
         .toast.raw .toast-face { color: #a0a0a0; }
-
         .toast.electro {
             background-color: #555; border-color: #ffff00;
             animation: shake 0.1s infinite;
         }
         .toast.electro .toast-face { color: #ffff00; text-shadow: 0 0 5px red; }
-
         .toast.perfect {
             background-color: #eebb55; border-color: #d4a017;
             box-shadow: 0 0 20px #ffd700;
         }
 
-        /* THE STUCK STATE - Does not pop up */
-        .toast.stuck {
-             animation: panicShake 0.2s infinite;
-        }
+        /* THE STUCK STATE */
+        .toast.stuck { animation: panicShake 0.2s infinite; }
         .toast.stuck .toast-face { color: #8b0000; font-size: 36px;}
 
-        @keyframes shake {
-            0% { transform: translateX(-2px); } 100% { transform: translateX(2px); }
-        }
+        @keyframes shake { 0% { transform: translateX(-2px); } 100% { transform: translateX(2px); } }
         @keyframes panicShake {
              0% { transform: translate(0, 0) rotate(0deg); }
             25% { transform: translate(-3px, 2px) rotate(-2deg); }
@@ -193,8 +188,7 @@
 
         /* --- The Handle --- */
         .handle-track {
-            position: absolute;
-            right: -25px; top: 50px; width: 15px; height: 90px;
+            position: absolute; right: -25px; top: 50px; width: 15px; height: 90px;
             background-color: #888; border-radius: 5px; z-index: 9;
         }
 
@@ -205,8 +199,6 @@
         }
         .handle-knob:active { background-color: #000; }
 
-        /* Animation State Classes */
-        /* Only pop up if it's NOT stuck */
         .popped:not(.stuck) { top: -90px !important; } 
         .knob-down { top: 115px !important; }
 
@@ -215,7 +207,7 @@
             margin-top: 50px;
             background: white; border: 4px solid #333;
             padding: 20px; border-radius: 15px;
-            width: 80%; max-width: 500px; min-height: 60px;
+            width: 90%; max-width: 500px; min-height: 60px;
             text-align: center; box-shadow: 6px 6px 0px #333;
             opacity: 0; transform: scale(0.9);
             transition: all 0.3s ease;
@@ -230,8 +222,31 @@
             font-family: inherit; background: #ff6b6b; color: white;
             border: none; border-radius: 8px; cursor: pointer;
             display: none; box-shadow: 0 4px #d43f3f; z-index: 101;
+            margin-bottom: 50px; /* Space at bottom for scrolling */
         }
         button:active { transform: translateY(4px); box-shadow: 0 0 #d43f3f; }
+
+        /* --- MOBILE OPTIMIZATION --- */
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.5rem;
+                margin-bottom: 40px;
+            }
+            /* Scale down the entire toaster drawing */
+            .toaster-container {
+                transform: scale(0.85);
+                margin-bottom: -20px; /* Reduce gap created by scaling */
+            }
+            /* Adjust sticky notes to be closer to center on small screens */
+            .note-1 { top: 10%; left: 0%; width: 80px; font-size: 11px;}
+            .note-2 { top: 12%; right: 0%; width: 80px; font-size: 11px;}
+            
+            #wisdom-display {
+                font-size: 16px;
+                padding: 15px;
+                margin-top: 30px;
+            }
+        }
 
     </style>
 </head>
@@ -369,7 +384,6 @@
                 if (outcome.type !== 'stuck') {
                     toast.classList.add('popped');
                 } else {
-                    // If stuck, shake the whole toaster rig!
                     toasterRig.classList.add('container-shake');
                 }
 
@@ -389,7 +403,7 @@
 
                 resetBtn.style.display = 'block';
 
-            }, 1200); // Slightly longer wait for suspense
+            }, 1200); 
         }
 
         function resetToaster() {
