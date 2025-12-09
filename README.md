@@ -11,8 +11,8 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 200vh;
-            margin: 0;
+            height: 100vh;
+            margin: 1;
             overflow: hidden;
         }
 
