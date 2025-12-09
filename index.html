@@ -3,255 +3,271 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Existential Toaster</title>
+    <title>The Chaos Toaster</title>
     <style>
         /* --- Main Layout --- */
         body {
-            background-color: #f0f8ff;
-            /* Using a fun, slightly messy font for the notes, falling back to monospace */
-            font-family: 'Comic Sans MS', 'Chalkboard SE', 'Courier New', monospace;
+            background-color: #e6f7ff;
+            font-family: 'Courier New', Courier, monospace;
             display: flex;
             flex-direction: column;
             align-items: center;
             min-height: 100vh;
             margin: 0;
             overflow: hidden;
-            position: relative;
+            user-select: none; /* Prevents highlighting text while clicking */
         }
 
         h1 {
             color: #333;
-            margin-top: 30px;
-            margin-bottom: 20px;
-            font-family: 'Courier New', Courier, monospace;
+            margin-top: 20px;
             z-index: 10;
         }
 
-        /* --- Sticky Notes --- */
+        /* --- Sticky Notes (Decorations) --- */
         .sticky-note {
             position: absolute;
-            background-color: #fff740; /* Bright yellow post-it color */
+            background-color: #fff740;
             padding: 15px;
-            width: 130px;
-            box-shadow: 4px 4px 10px rgba(0,0,0,0.2);
-            font-size: 14px;
+            width: 120px;
+            box-shadow: 3px 3px 8px rgba(0,0,0,0.2);
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            font-size: 13px;
             text-align: center;
-            border-bottom-right-radius: 20px 5px; /* Slight curl effect */
+            transform: rotate(-5deg);
+            z-index: 2;
+        }
+
+        .note-1 { top: 150px; left: 10%; transform: rotate(-10deg); }
+        .note-2 { top: 180px; right: 10%; transform: rotate(8deg); background-color: #ff99cc; }
+        
+        /* --- The Toaster Rig --- */
+        .toaster-container {
+            position: relative;
+            width: 320px;
+            height: 240px; /* Made taller to hide the bread bottom */
+            margin-top: 80px; 
             z-index: 5;
         }
 
-        .note-left {
-            top: 200px;
-            left: 10%;
-            transform: rotate(-12deg);
-        }
-
-        .note-right {
-            top: 220px;
-            right: 10%;
-            transform: rotate(8deg);
-        }
-
-        .note-bottom {
-            bottom: 150px;
-            right: 20%;
-            transform: rotate(-5deg);
-            z-index: 10; /* sits on top of text bubble area */
-        }
+        /* --- EFFECTS LAYER --- */
         
-        .skull-icon { font-size: 24px; display: block; margin-bottom: 5px;}
-
-
-        /* --- The Toaster Section --- */
-        .toaster-container {
-            position: relative;
-            width: 300px;
-            height: 200px;
-            /* Moved down so it doesn't cover the title */
-            margin-top: 100px; 
-            z-index: 6;
-        }
-
-        /* Lightning Bolts (Hidden by default) */
+        /* 1. Lightning (Electro Scenario) */
         .lightning {
             position: absolute;
             font-size: 60px;
-            color: #FFD700; /* Gold/Yellow */
+            color: #FFD700;
             opacity: 0;
-            z-index: 4;
-            transition: opacity 0.1s ease-in-out;
-            text-shadow: 0 0 10px #FFA500;
+            z-index: 20;
+            text-shadow: 0 0 15px #FFA500;
+            pointer-events: none;
         }
-        .bolt-1 { top: -80px; left: 40px; transform: rotate(-30deg); }
-        .bolt-2 { top: -100px; left: 120px; transform: rotate(10deg); }
-        .bolt-3 { top: -80px; right: 40px; transform: rotate(30deg); }
+        .bolt-1 { top: -80px; left: 20px; transform: rotate(-30deg); }
+        .bolt-2 { top: -100px; right: 20px; transform: rotate(30deg); }
 
-        /* Class added via JS to trigger the flash */
-        .zap-active {
-            opacity: 1;
-            animation: flash 0.5s linear infinite alternate;
+        .zap-active { animation: flash 0.1s linear infinite alternate; opacity: 1; }
+        @keyframes flash { from { opacity: 0; } to { opacity: 1; } }
+
+        /* 2. Smoke (Burnt Scenario) */
+        .smoke-particle {
+            position: absolute;
+            background: #555;
+            border-radius: 50%;
+            opacity: 0;
+            z-index: 1; /* Behind toast */
+        }
+        .smoke-active { animation: rise 2s infinite ease-out; }
+        @keyframes rise {
+            0% { transform: translateY(0) scale(1); opacity: 0.7; }
+            100% { transform: translateY(-100px) scale(3); opacity: 0; }
         }
 
-        @keyframes flash {
-            0% { opacity: 0.6; transform: scale(1); }
-            100% { opacity: 1; transform: scale(1.2); }
+        /* 3. Holy Glow (Perfect Scenario) */
+        .glow-bg {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(255,255,200,0.8) 0%, rgba(255,255,255,0) 70%);
+            top: -100px;
+            left: 10px;
+            opacity: 0;
+            z-index: 1;
+            transition: opacity 1s;
         }
 
-
-        /* The Toast (Hidden at first) */
+        /* --- The Toast --- */
         .toast {
             position: absolute;
             width: 160px;
             height: 140px;
-            background-color: #f4a460;
-            border: 3px solid #8b4513;
+            background-color: #f4a460; /* Default Color */
+            border: 4px solid #8b4513;
             border-radius: 15px 15px 5px 5px;
-            left: 70px;
-            top: 60px; /* Starting position inside toaster */
-            transition: top 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            z-index: 3;
+            left: 80px;
+            /* FIX: Top is set so bottom sits at 200px (inside toaster body) */
+            top: 60px; 
+            transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.3s;
+            z-index: 4; /* Behind toaster front, in front of back */
             display: flex;
             align-items: center;
             justify-content: center;
             text-align: center;
-            padding: 5px;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
         }
 
-        /* The Toast Face */
         .toast-face {
-            font-size: 24px;
+            font-size: 30px;
             font-weight: bold;
             color: #5a2d0c;
-            font-family: monospace;
         }
 
-        /* The Toaster Body */
+        /* SCENARIO STYLES */
+        
+        /* Burnt */
+        .toast.burnt {
+            background-color: #333;
+            border-color: #000;
+        }
+        .toast.burnt .toast-face { color: #fff; }
+
+        /* Raw */
+        .toast.raw {
+            background-color: #fdf5e6;
+            border-color: #e0d5c0;
+        }
+        .toast.raw .toast-face { color: #a0a0a0; }
+
+        /* Electro */
+        .toast.electro {
+            background-color: #555;
+            border-color: #ffff00;
+            animation: shake 0.1s infinite;
+        }
+        .toast.electro .toast-face { 
+            color: #ffff00; 
+            text-shadow: 0 0 5px red;
+        }
+
+        /* Perfect */
+        .toast.perfect {
+            background-color: #eebb55;
+            border-color: #d4a017;
+            box-shadow: 0 0 20px #ffd700;
+        }
+
+        @keyframes shake {
+            0% { transform: translateX(-2px); }
+            100% { transform: translateX(2px); }
+        }
+
+        /* --- The Toaster Body --- */
         .toaster-body {
             position: absolute;
-            width: 300px;
-            height: 180px;
-            background: linear-gradient(135deg, #e0e0e0 0%, #c0c0c0 100%);
-            border: 4px solid #555;
+            width: 320px;
+            height: 200px; /* Taller body to hide the bread */
+            background: linear-gradient(180deg, #dcdcdc 0%, #a9a9a9 100%);
+            border: 5px solid #555;
             border-radius: 30px;
             bottom: 0;
-            z-index: 5;
+            z-index: 10; /* Covers the toast when down */
             box-shadow: 10px 10px 0px rgba(0,0,0,0.1);
         }
 
-        /* Toaster Slots */
         .slot {
             position: absolute;
-            top: 20px;
+            top: 25px;
             left: 50%;
             transform: translateX(-50%);
-            width: 200px;
-            height: 15px;
+            width: 220px;
+            height: 18px;
             background-color: #222;
             border-radius: 10px;
-            border-bottom: 2px solid #777;
+            border-bottom: 2px solid #666;
         }
 
-        /* The Handle */
+        /* --- The Handle --- */
         .handle-track {
             position: absolute;
-            right: -20px;
-            top: 40px;
+            right: -25px;
+            top: 50px;
             width: 15px;
-            height: 80px;
+            height: 90px;
             background-color: #888;
             border-radius: 5px;
-            z-index: 4;
+            z-index: 9;
         }
 
         .handle-knob {
             position: absolute;
-            right: -35px;
-            top: 40px; /* This will animate */
-            width: 40px;
-            height: 20px;
+            right: -45px;
+            top: 50px;
+            width: 50px;
+            height: 25px;
             background-color: #333;
             border-radius: 5px;
             cursor: pointer;
             transition: top 0.3s;
-            z-index: 6;
+            z-index: 11;
         }
-
         .handle-knob:active { background-color: #000; }
 
-        /* --- Controls & Text --- */
-        /* The Wisdom Text Bubble */
+        /* Animation State Classes */
+        .popped { top: -90px !important; } /* Toast moves up */
+        .knob-down { top: 115px !important; } /* Handle moves down */
+
+        /* --- Text Area --- */
         #wisdom-display {
-            margin-top: 60px;
+            margin-top: 50px;
             background: white;
-            border: 3px solid #333;
-            padding: 25px;
-            border-radius: 20px;
-            max-width: 400px;
-            min-height: 50px;
+            border: 4px solid #333;
+            padding: 20px;
+            border-radius: 15px;
+            width: 80%;
+            max-width: 500px;
+            min-height: 60px;
             text-align: center;
-            box-shadow: 8px 8px 0px #333;
+            box-shadow: 6px 6px 0px #333;
             opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.5s ease;
-            font-family: 'Courier New', Courier, monospace;
+            transform: scale(0.9);
+            transition: all 0.3s ease;
             font-size: 18px;
             font-weight: bold;
-            z-index: 8;
-            position: relative;
+            z-index: 100;
         }
 
-        .visible {
-            opacity: 1 !important;
-            transform: translateY(0) !important;
-        }
-
-        /* Animation States */
-        .popped { top: -80px; } /* Toast goes up */
-        .knob-down { top: 100px; } /* Handle goes down */
+        .visible { opacity: 1 !important; transform: scale(1) !important; }
 
         button {
-            margin-top: 40px;
-            padding: 12px 25px;
+            margin-top: 20px;
+            padding: 15px 30px;
             font-size: 18px;
-            font-family: 'Courier New', Courier, monospace;
-            font-weight: bold;
+            font-family: inherit;
             background: #ff6b6b;
             color: white;
-            border: 3px solid #c94545;
+            border: none;
             border-radius: 8px;
             cursor: pointer;
-            display: none; /* Hidden until needed */
-            box-shadow: 4px 4px 0px #c94545;
-            z-index: 10;
+            display: none;
+            box-shadow: 0 4px #d43f3f;
         }
-        button:active {
-            transform: translate(2px, 2px);
-            box-shadow: 2px 2px 0px #c94545;
-        }
+        button:active { transform: translateY(4px); box-shadow: 0 0 #d43f3f; }
 
     </style>
 </head>
 <body>
 
-    <h1>The Existential Toaster</h1>
+    <h1>The Chaos Toaster</h1>
 
-    <div class="sticky-note note-left">
-        ZAP! Now I'm "Current"ly Toast!
-    </div>
-    <div class="sticky-note note-right">
-        <span class="skull-icon">☠️🍞</span>
-        Warning: High Voltage Breakfast!
-    </div>
-    <div class="sticky-note note-bottom">
-        Don't be shocked by my crispiness!
-    </div>
-
+    <div class="sticky-note note-1">"I think the timer is broken."</div>
+    <div class="sticky-note note-2">DO NOT USE FORK</div>
 
     <div class="toaster-container">
-        <div class="lightning bolt-1">⚡</div>
-        <div class="lightning bolt-2">⚡</div>
-        <div class="lightning bolt-3">⚡</div>
+        <div class="glow-bg" id="halo"></div>
+        <div class="lightning bolt-1" id="bolt1">⚡</div>
+        <div class="lightning bolt-2" id="bolt2">⚡</div>
+        
+        <div class="smoke-particle" style="left: 100px; width: 20px; height: 20px; top: 0px;" id="s1"></div>
+        <div class="smoke-particle" style="left: 150px; width: 30px; height: 30px; top: 20px;" id="s2"></div>
+        <div class="smoke-particle" style="left: 200px; width: 25px; height: 25px; top: 10px;" id="s3"></div>
 
         <div class="toast" id="toast">
             <div class="toast-face">o_o</div>
@@ -265,7 +281,7 @@
         <div class="handle-knob" id="handle" onclick="toastBread()"></div>
     </div>
 
-    <div id="wisdom-display">Pull the lever to confront your destiny.</div>
+    <div id="wisdom-display">Risk it all for breakfast.</div>
     <button id="reset-btn" onclick="resetToaster()">Insert New Bread</button>
 
     <script>
@@ -274,66 +290,113 @@
         const display = document.getElementById('wisdom-display');
         const resetBtn = document.getElementById('reset-btn');
         const face = document.querySelector('.toast-face');
-        const lightningBolts = document.querySelectorAll('.lightning');
-
-        const quotes = [
-            "I used to be dough. I had dreams. Now I am just crunchy.",
-            "Is it hot in here, or is it just my impending doom?",
-            "Please do not apply the avocado. I cannot afford the rent.",
-            "I am bread. I am pain. I am breakfast.",
-            "Crumbs are just memories we leave behind.",
-            "I have achieved maximum crispiness. Worship me.",
-            "Why do you butter me? Do you think I am dry?",
-            "I was wheat once. I waved in the wind. Now I sit in a metal box.",
-            "Eat me quickly, before I get cold and chewy.",
-            "Life is like a toaster setting: usually disappointing or burnt.",
-            "I am the best thing since... wait, I AM sliced bread.",
-            "Do not drop me butter-side down. I have dignity."
-        ];
-
-        const faces = ["O_O", ">_<", "-_-", "^_^", "T_T", "x_x", "o_0", "⊙_⊙"];
+        const halo = document.getElementById('halo');
+        const bolts = [document.getElementById('bolt1'), document.getElementById('bolt2')];
+        const smokeParticles = [document.getElementById('s1'), document.getElementById('s2'), document.getElementById('s3')];
 
         let isToasting = false;
+
+        // --- THE SCENARIOS ---
+        const scenarios = [
+            {
+                type: 'perfect',
+                face: 'uwu',
+                quotes: [
+                    "I HAVE ASCENDED.",
+                    "Behold my golden crust and weep.",
+                    "I am the perfect carbohydrate.",
+                    "No butter required. I am divine."
+                ]
+            },
+            {
+                type: 'burnt',
+                face: 'x_x',
+                quotes: [
+                    "I see only darkness.",
+                    "It smells like failure in here.",
+                    "I'm not burnt, I'm 'Cajun Style'.",
+                    "Cough. Cough. Help."
+                ]
+            },
+            {
+                type: 'electro',
+                face: '⚡_⚡',
+                quotes: [
+                    "BZZZZT! 120 VOLTS OF FLAVOR!",
+                    "I CAN FEEL MY ATOMS VIBRATING!",
+                    "DON'T TOUCH ME I'M SPICY!",
+                    "SYSTEM OVERLOAD. SYSTEM DELICIOUS."
+                ]
+            },
+            {
+                type: 'raw',
+                face: 'T_T',
+                quotes: [
+                    "I am cold and moist.",
+                    "Why did you even bother?",
+                    "Put me back, I'm naked!",
+                    "This is the worst spa day ever."
+                ]
+            }
+        ];
 
         function toastBread() {
             if (isToasting) return;
             isToasting = true;
 
-            // 1. Push handle down
+            // 1. Animate Handle
             handle.classList.add('knob-down');
             display.classList.remove('visible');
-            
-            // 2. Wait a moment for "toasting"
-            setTimeout(() => {
-                // POP!
-                toast.classList.add('popped');
-                
-                // Activate Lightning!
-                lightningBolts.forEach(bolt => bolt.classList.add('zap-active'));
+            display.innerText = "...";
 
-                // Randomize Content
-                const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
-                const randomFace = faces[Math.floor(Math.random() * faces.length)];
+            // 2. Wait...
+            setTimeout(() => {
+                // 3. Roll the Dice (Random Scenario)
+                const outcome = scenarios[Math.floor(Math.random() * scenarios.length)];
                 
-                face.innerText = randomFace;
-                display.innerText = `"${randomQuote}"`;
+                // 4. Apply Visuals
+                toast.classList.add('popped');
+                toast.classList.add(outcome.type);
+                face.innerText = outcome.face;
+
+                // Handle Specific Effects
+                if(outcome.type === 'electro') {
+                    bolts.forEach(b => b.classList.add('zap-active'));
+                } else if (outcome.type === 'burnt') {
+                    smokeParticles.forEach(s => s.classList.add('smoke-active'));
+                } else if (outcome.type === 'perfect') {
+                    halo.style.opacity = '1';
+                }
+
+                // 5. Text
+                const randomQuote = outcome.quotes[Math.floor(Math.random() * outcome.quotes.length)];
+                display.innerText = randomQuote;
                 display.classList.add('visible');
-                
-                // Show reset button
+
                 resetBtn.style.display = 'block';
 
-            }, 800);
+            }, 1000);
         }
 
         function resetToaster() {
             isToasting = false;
+            
+            // Reset Positions
             toast.classList.remove('popped');
             handle.classList.remove('knob-down');
+            
+            // Remove all specific classes
+            toast.classList.remove('perfect', 'burnt', 'electro', 'raw');
+            
+            // Reset Effects
+            bolts.forEach(b => b.classList.remove('zap-active'));
+            smokeParticles.forEach(s => s.classList.remove('smoke-active'));
+            halo.style.opacity = '0';
+            
+            // Reset Text
             display.classList.remove('visible');
             resetBtn.style.display = 'none';
             face.innerText = "o_o";
-            // Turn off lightning
-            lightningBolts.forEach(bolt => bolt.classList.remove('zap-active'));
         }
     </script>
 </body>
