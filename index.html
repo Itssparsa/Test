@@ -15,7 +15,9 @@
             justify-content: center; /* Centers vertically */
             min-height: 100vh;
             margin: 0;
-            overflow-x: hidden; /* Prevent side scrolling */
+            /* FIX: Allow vertical scrolling if screen is too short, hide horizontal */
+            overflow-x: hidden;
+            overflow-y: auto; 
             user-select: none;
             padding: 20px;
             box-sizing: border-box;
@@ -23,11 +25,13 @@
 
         h1 {
             color: #333;
-            margin-top: 0;
-            margin-bottom: 60px; /* More space between title and toaster */
+            margin-top: 40px;
+            /* FIX: Increased gap so the toast doesn't hit the text when it pops */
+            margin-bottom: 120px; 
             z-index: 10;
             text-align: center;
             font-size: 2rem;
+            position: relative;
         }
 
         /* --- Sticky Notes (Responsive Positions) --- */
@@ -41,10 +45,10 @@
             font-size: 12px;
             text-align: center;
             z-index: 2;
-            pointer-events: none; /* Let clicks pass through to background */
+            pointer-events: none;
         }
 
-        /* Positioned relative to viewport width/height */
+        /* Adjusted positions to fit the new spacing */
         .note-1 { top: 15%; left: 5%; transform: rotate(-12deg); }
         .note-2 { top: 18%; right: 5%; transform: rotate(10deg); background-color: #ff99cc; }
         .note-3 { bottom: 10%; left: 10%; transform: rotate(5deg); background-color: #a8e6cf; z-index: 12;}
@@ -55,7 +59,6 @@
             width: 320px;
             height: 240px;
             z-index: 5;
-            /* No fixed margin-top, we use Flexbox to center it now */
         }
         
         /* The container shakes when stuck */
@@ -222,7 +225,7 @@
             font-family: inherit; background: #ff6b6b; color: white;
             border: none; border-radius: 8px; cursor: pointer;
             display: none; box-shadow: 0 4px #d43f3f; z-index: 101;
-            margin-bottom: 50px; /* Space at bottom for scrolling */
+            margin-bottom: 50px;
         }
         button:active { transform: translateY(4px); box-shadow: 0 0 #d43f3f; }
 
@@ -230,14 +233,12 @@
         @media (max-width: 600px) {
             h1 {
                 font-size: 1.5rem;
-                margin-bottom: 40px;
+                margin-bottom: 110px; /* Keep gap large on mobile too */
             }
-            /* Scale down the entire toaster drawing */
             .toaster-container {
                 transform: scale(0.85);
-                margin-bottom: -20px; /* Reduce gap created by scaling */
+                margin-bottom: -20px;
             }
-            /* Adjust sticky notes to be closer to center on small screens */
             .note-1 { top: 10%; left: 0%; width: 80px; font-size: 11px;}
             .note-2 { top: 12%; right: 0%; width: 80px; font-size: 11px;}
             
@@ -247,7 +248,6 @@
                 margin-top: 30px;
             }
         }
-
     </style>
 </head>
 <body>
