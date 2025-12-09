@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Chaos Toaster: Smile Edition</title>
+    <title>The Ultimate Chaos Toaster</title>
     <style>
         /* --- Main Layout --- */
         body {
@@ -22,9 +22,10 @@
             color: #333;
             margin-top: 20px;
             z-index: 10;
+            text-align: center;
         }
 
-        /* --- Decorations --- */
+        /* --- Sticky Notes (Decorations) --- */
         .sticky-note {
             position: absolute;
             background-color: #fff740;
@@ -34,23 +35,34 @@
             font-family: 'Comic Sans MS', cursive, sans-serif;
             font-size: 13px;
             text-align: center;
-            transform: rotate(-5deg);
             z-index: 2;
         }
-        .note-1 { top: 150px; left: 10%; transform: rotate(-10deg); }
-        .note-2 { top: 180px; right: 10%; transform: rotate(8deg); background-color: #ff99cc; }
 
+        .note-1 { top: 140px; left: 8%; transform: rotate(-12deg); }
+        .note-2 { top: 170px; right: 8%; transform: rotate(10deg); background-color: #ff99cc; }
+        .note-3 { bottom: 120px; left: 15%; transform: rotate(5deg); background-color: #a8e6cf; z-index: 12;}
+        
         /* --- The Toaster Rig --- */
         .toaster-container {
             position: relative;
             width: 320px;
             height: 240px;
-            margin-top: 80px; 
+            margin-top: 60px; 
             z-index: 5;
         }
+        
+        /* The container shakes when stuck */
+        .container-shake { animation: rattle 0.1s infinite; }
+        @keyframes rattle {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            25% { transform: translate(-1px, -2px) rotate(-1deg); }
+            50% { transform: translate(-2px, 0px) rotate(1deg); }
+            75% { transform: translate(2px, 1px) rotate(0deg); }
+            100% { transform: translate(1px, -1px) rotate(0deg); }
+        }
+
 
         /* --- EFFECTS LAYER --- */
-        
         /* Lightning */
         .lightning {
             position: absolute;
@@ -58,20 +70,39 @@
             color: #FFD700;
             opacity: 0;
             z-index: 20;
+            text-shadow: 0 0 15px #FFA500;
             pointer-events: none;
         }
         .bolt-1 { top: -80px; left: 20px; transform: rotate(-30deg); }
         .bolt-2 { top: -100px; right: 20px; transform: rotate(30deg); }
         .zap-active { animation: flash 0.1s linear infinite alternate; opacity: 1; }
+        @keyframes flash { from { opacity: 0; } to { opacity: 1; } }
 
-        /* Confetti */
-        .confetti {
+        /* Smoke */
+        .smoke-particle {
             position: absolute;
-            width: 10px;
-            height: 10px;
-            background-color: #f00;
-            z-index: 50;
-            pointer-events: none;
+            background: #555;
+            border-radius: 50%;
+            opacity: 0;
+            z-index: 1;
+        }
+        .smoke-active { animation: rise 2s infinite ease-out; }
+        @keyframes rise {
+            0% { transform: translateY(0) scale(1); opacity: 0.7; }
+            100% { transform: translateY(-100px) scale(3); opacity: 0; }
+        }
+
+        /* Holy Glow */
+        .glow-bg {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(255,255,200,0.8) 0%, rgba(255,255,255,0) 70%);
+            top: -100px;
+            left: 10px;
+            opacity: 0;
+            z-index: 1;
+            transition: opacity 1s;
         }
 
         /* --- The Toast --- */
@@ -79,77 +110,63 @@
             position: absolute;
             width: 160px;
             height: 140px;
-            background-color: #f4a460;
+            background-color: #f4a460; /* Starting Dough Color */
             border: 4px solid #8b4513;
             border-radius: 15px 15px 5px 5px;
             left: 80px;
-            top: 60px; /* Hidden inside */
+            top: 60px; /* Sit inside toaster */
             transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.3s;
             z-index: 4;
             display: flex;
             align-items: center;
             justify-content: center;
             text-align: center;
-            cursor: pointer; /* Change cursor to indicate interaction */
         }
 
         .toast-face {
             font-size: 30px;
             font-weight: bold;
             color: #5a2d0c;
-            position: relative;
-            z-index: 2;
         }
-
-        /* Sunglasses Overlay */
-        .sunglasses {
-            display: none;
-            position: absolute;
-            font-size: 50px;
-            top: 35px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 5;
-        }
-
-        /* Butter Overlay */
-        .butter {
-            display: none;
-            position: absolute;
-            width: 40px;
-            height: 30px;
-            background-color: #fff700;
-            border: 2px solid #e6db00;
-            border-radius: 5px;
-            top: -40px; /* Starts above */
-            left: 60px;
-            transition: top 0.5s ease;
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
-        }
-        .butter-active { display: block; top: 10px; }
-
 
         /* SCENARIO STYLES */
-        .toast.normal { background-color: #cd853f; border-color: #8b4513; }
+        .toast.normal { background-color: #ffc87c; border-color: #c98a45; }
+        
         .toast.burnt { background-color: #333; border-color: #000; }
         .toast.burnt .toast-face { color: #fff; }
+
         .toast.raw { background-color: #fdf5e6; border-color: #e0d5c0; }
         .toast.raw .toast-face { color: #a0a0a0; }
-        .toast.electro { background-color: #555; border-color: #ffff00; animation: shake 0.1s infinite; }
+
+        .toast.electro {
+            background-color: #555; border-color: #ffff00;
+            animation: shake 0.1s infinite;
+        }
         .toast.electro .toast-face { color: #ffff00; text-shadow: 0 0 5px red; }
-        .toast.party { background-color: #ff69b4; border-color: #c71585; }
 
-        @keyframes shake { 0% { transform: translateX(-2px); } 100% { transform: translateX(2px); } }
-        @keyframes flash { from { opacity: 0; } to { opacity: 1; } }
+        .toast.perfect {
+            background-color: #eebb55; border-color: #d4a017;
+            box-shadow: 0 0 20px #ffd700;
+        }
 
-        /* Animation States */
-        .popped { top: -90px !important; }
-        .stuck { top: 10px !important; animation: wiggle 0.2s infinite; } /* Stuck halfway */
-        .knob-down { top: 115px !important; }
+        /* THE STUCK STATE - Does not pop up */
+        .toast.stuck {
+             animation: panicShake 0.2s infinite;
+        }
+        .toast.stuck .toast-face { color: #8b0000; font-size: 36px;}
 
-        @keyframes wiggle { 0% {transform: rotate(-2deg);} 50% {transform: rotate(2deg);} 100% {transform: rotate(-2deg);} }
+        @keyframes shake {
+            0% { transform: translateX(-2px); } 100% { transform: translateX(2px); }
+        }
+        @keyframes panicShake {
+             0% { transform: translate(0, 0) rotate(0deg); }
+            25% { transform: translate(-3px, 2px) rotate(-2deg); }
+            50% { transform: translate(0, -2px) rotate(0deg); }
+            75% { transform: translate(3px, 2px) rotate(2deg); }
+            100% { transform: translate(0, 0) rotate(0deg); }
+        }
 
-        /* --- Toaster Body --- */
+        /* --- The Toaster Body --- */
         .toaster-body {
             position: absolute;
             width: 320px;
@@ -159,50 +176,60 @@
             border-radius: 30px;
             bottom: 0;
             z-index: 10;
+            box-shadow: 10px 10px 0px rgba(0,0,0,0.1);
         }
+
         .slot {
             position: absolute;
-            top: 25px; left: 50%; transform: translateX(-50%);
-            width: 220px; height: 18px; background-color: #222; border-radius: 10px;
+            top: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 220px;
+            height: 18px;
+            background-color: #222;
+            border-radius: 10px;
             border-bottom: 2px solid #666;
         }
-        .handle-track { position: absolute; right: -25px; top: 50px; width: 15px; height: 90px; background-color: #888; border-radius: 5px; z-index: 9; }
-        .handle-knob { position: absolute; right: -45px; top: 50px; width: 50px; height: 25px; background-color: #333; border-radius: 5px; cursor: pointer; transition: top 0.3s; z-index: 11; }
+
+        /* --- The Handle --- */
+        .handle-track {
+            position: absolute;
+            right: -25px; top: 50px; width: 15px; height: 90px;
+            background-color: #888; border-radius: 5px; z-index: 9;
+        }
+
+        .handle-knob {
+            position: absolute; right: -45px; top: 50px; width: 50px; height: 25px;
+            background-color: #333; border-radius: 5px; cursor: pointer;
+            transition: top 0.3s; z-index: 11;
+        }
         .handle-knob:active { background-color: #000; }
+
+        /* Animation State Classes */
+        /* Only pop up if it's NOT stuck */
+        .popped:not(.stuck) { top: -90px !important; } 
+        .knob-down { top: 115px !important; }
 
         /* --- Text Area --- */
         #wisdom-display {
             margin-top: 50px;
-            background: white;
-            border: 4px solid #333;
-            padding: 20px;
-            border-radius: 15px;
-            width: 80%;
-            max-width: 500px;
-            min-height: 60px;
-            text-align: center;
-            box-shadow: 6px 6px 0px #333;
-            opacity: 0;
-            transform: scale(0.9);
+            background: white; border: 4px solid #333;
+            padding: 20px; border-radius: 15px;
+            width: 80%; max-width: 500px; min-height: 60px;
+            text-align: center; box-shadow: 6px 6px 0px #333;
+            opacity: 0; transform: scale(0.9);
             transition: all 0.3s ease;
-            font-size: 18px;
-            font-weight: bold;
-            z-index: 100;
+            font-size: 18px; font-weight: bold; z-index: 100;
+            position: relative;
         }
+
         .visible { opacity: 1 !important; transform: scale(1) !important; }
 
         button {
-            margin-top: 20px;
-            padding: 15px 30px;
-            font-size: 18px;
-            font-family: inherit;
-            background: #ff6b6b;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            display: none;
-            box-shadow: 0 4px #d43f3f;
+            margin-top: 20px; padding: 15px 30px; font-size: 18px;
+            font-family: inherit; background: #ff6b6b; color: white;
+            border: none; border-radius: 8px; cursor: pointer;
+            display: none; box-shadow: 0 4px #d43f3f; z-index: 101;
         }
         button:active { transform: translateY(4px); box-shadow: 0 0 #d43f3f; }
 
@@ -210,19 +237,23 @@
 </head>
 <body>
 
-    <h1>The Smile Toaster</h1>
+    <h1>The Chaos Toaster<br><span style="font-size: 0.6em;">(Now with 50% more anxiety!)</span></h1>
 
-    <div class="sticky-note note-1">"Why am I here?"</div>
-    <div class="sticky-note note-2">Free Hugs (JK)</div>
+    <div class="sticky-note note-1">"Days since last kitchen fire: 0"</div>
+    <div class="sticky-note note-2">Do not feed the toaster after midnight.</div>
+    <div class="sticky-note note-3">If bread screams, unplug unit.</div>
 
-    <div class="toaster-container">
+    <div class="toaster-container" id="toaster-rig">
+        <div class="glow-bg" id="halo"></div>
         <div class="lightning bolt-1" id="bolt1">⚡</div>
         <div class="lightning bolt-2" id="bolt2">⚡</div>
+        
+        <div class="smoke-particle" style="left: 100px; width: 20px; height: 20px; top: 0px;" id="s1"></div>
+        <div class="smoke-particle" style="left: 150px; width: 30px; height: 30px; top: 20px;" id="s2"></div>
+        <div class="smoke-particle" style="left: 200px; width: 25px; height: 25px; top: 10px;" id="s3"></div>
 
-        <div class="toast" id="toast" onclick="unstuckToast()">
+        <div class="toast" id="toast">
             <div class="toast-face">o_o</div>
-            <div class="sunglasses">🕶️</div>
-            <div class="butter"></div>
         </div>
 
         <div class="toaster-body">
@@ -233,76 +264,84 @@
         <div class="handle-knob" id="handle" onclick="toastBread()"></div>
     </div>
 
-    <div id="wisdom-display">Ready for greatness?</div>
+    <div id="wisdom-display">Pull the lever to confront your destiny.</div>
     <button id="reset-btn" onclick="resetToaster()">Insert New Bread</button>
 
     <script>
+        const toasterRig = document.getElementById('toaster-rig');
         const toast = document.getElementById('toast');
         const handle = document.getElementById('handle');
         const display = document.getElementById('wisdom-display');
         const resetBtn = document.getElementById('reset-btn');
         const face = document.querySelector('.toast-face');
-        const sunglasses = document.querySelector('.sunglasses');
-        const butter = document.querySelector('.butter');
-        const bolts = document.querySelectorAll('.lightning');
+        const halo = document.getElementById('halo');
+        const bolts = [document.getElementById('bolt1'), document.getElementById('bolt2')];
+        const smokeParticles = [document.getElementById('s1'), document.getElementById('s2'), document.getElementById('s3')];
 
         let isToasting = false;
-        let isStuck = false;
 
+        // --- THE 6 POSSIBLE DESTINIES ---
         const scenarios = [
             {
-                id: 'normal',
                 type: 'normal',
-                face: '^_^',
+                face: 'o_o',
                 quotes: [
-                    "I am adequate.",
-                    "Look at me! I am perfectly average!",
-                    "Not great, not terrible. Just toast.",
-                    "I have achieved 'Standard Breakfast'."
+                    "I am bread. I am pain. I am breakfast.",
+                    "Is it hot in here, or is it just my impending doom?",
+                    "Please do not apply the avocado. I cannot afford the rent.",
+                    "I used to have dreams. Now I have crumbs.",
+                    "I'm mediocre! Just like you wanted!"
                 ]
             },
             {
-                id: 'burnt',
+                type: 'stuck',
+                face: '>_<',
+                quotes: [
+                    "HELP! MY HIPS ARE TOO WIDE!",
+                    "Tell my family I love th—mmmphhh!!",
+                    "It's dark down here and I smell old cheese.",
+                    "A LITTLE HELP PLEASE?!",
+                    "Pivot! PIVOT!"
+                ]
+            },
+            {
+                type: 'perfect',
+                face: 'uwu',
+                quotes: [
+                    "I HAVE ASCENDED.",
+                    "Behold my golden crust and weep.",
+                    "No butter required. I am divine.",
+                    "I am the main character."
+                ]
+            },
+            {
                 type: 'burnt',
                 face: 'x_x',
                 quotes: [
-                    "I have stared into the sun.",
-                    "I'm not burnt, I'm 'Vintage'.",
-                    "Cough. Cough. Help.",
-                    "My career is ruined."
+                    "Everything is ash.",
+                    "I'm not burnt, I'm 'Cajun Style'.",
+                    "*Cough* *Wheeze* Help.",
+                    "Some men just want to watch the toast burn."
                 ]
             },
             {
-                id: 'electro',
                 type: 'electro',
                 face: '⚡_⚡',
                 quotes: [
-                    "UNLIMITED POWER!!!",
-                    "DO NOT BATHE WITH ME!",
-                    "I taste like batteries!",
-                    "Zap zap zap zap!"
+                    "BZZZZT! 120 VOLTS OF FLAVOR!",
+                    "I CAN FEEL MY ATOMS VIBRATING!",
+                    "DON'T TOUCH ME I'M SPICY!",
+                    "UNLIMITED POWER!!!"
                 ]
             },
             {
-                id: 'party',
-                type: 'party',
-                face: 'B-)',
+                type: 'raw',
+                face: 'T_T',
                 quotes: [
-                    "Too cool for this kitchen.",
-                    "Let's get this party started!",
-                    "I'm crisp, I'm fly, I'm ready.",
-                    "YOLO (You Only Loaf Once)."
-                ]
-            },
-            {
-                id: 'stuck', /* Special Logic */
-                type: 'normal',
-                face: '>_<',
-                quotes: [
-                    "HELP! I'M STUCK!",
-                    "My hips are too wide!",
-                    "Click me! CLICK ME!",
-                    "It's tight in here!"
+                    "Why did you even bother?",
+                    "Put me back, I'm naked!",
+                    "I am disappointingly moist.",
+                    "This is the worst spa day ever."
                 ]
             }
         ];
@@ -311,100 +350,68 @@
             if (isToasting) return;
             isToasting = true;
 
+            // 1. Animate Handle
             handle.classList.add('knob-down');
             display.classList.remove('visible');
-            display.innerText = "...";
+            display.innerText = "Toasting toasting toasting...";
+            face.innerText = "-_-"; // Sleeping face while toasting
 
+            // 2. Wait...
             setTimeout(() => {
+                // 3. Roll the Dice
                 const outcome = scenarios[Math.floor(Math.random() * scenarios.length)];
                 
-                // Reset basic styles
-                face.innerText = outcome.face;
+                // 4. Apply Base Classes
                 toast.classList.add(outcome.type);
+                face.innerText = outcome.face;
 
-                // --- Handle Outcomes ---
-                
-                if(outcome.id === 'stuck') {
-                    // STUCK LOGIC
-                    isStuck = true;
-                    toast.classList.add('stuck');
-                    display.innerText = outcome.quotes[Math.floor(Math.random() * outcome.quotes.length)];
-                    display.classList.add('visible');
-                    // Do not show reset button yet, user must click bread
-                    return; 
+                // 5. Handle "Stuck" vs "Popped" logic
+                if (outcome.type !== 'stuck') {
+                    toast.classList.add('popped');
+                } else {
+                    // If stuck, shake the whole toaster rig!
+                    toasterRig.classList.add('container-shake');
                 }
 
-                // NORMAL POP
-                toast.classList.add('popped');
-
-                if(outcome.id === 'electro') {
+                // 6. Handle Specific Effects
+                if(outcome.type === 'electro') {
                     bolts.forEach(b => b.classList.add('zap-active'));
-                } 
-                else if (outcome.id === 'party') {
-                    sunglasses.style.display = 'block';
-                    fireConfetti();
-                }
-                else if (outcome.id === 'normal') {
-                    // Delay butter slightly
-                    setTimeout(() => { butter.classList.add('butter-active'); }, 400);
+                } else if (outcome.type === 'burnt') {
+                    smokeParticles.forEach(s => s.classList.add('smoke-active'));
+                } else if (outcome.type === 'perfect') {
+                    halo.style.opacity = '1';
                 }
 
-                // Show Text
+                // 7. Text
                 const randomQuote = outcome.quotes[Math.floor(Math.random() * outcome.quotes.length)];
                 display.innerText = `"${randomQuote}"`;
                 display.classList.add('visible');
+
                 resetBtn.style.display = 'block';
 
-            }, 1000);
-        }
-
-        function unstuckToast() {
-            if(!isStuck) return;
-            
-            // Pop it out!
-            isStuck = false;
-            toast.classList.remove('stuck');
-            toast.classList.add('popped');
-            face.innerText = "O_O";
-            display.innerText = "FREEDOM!!!";
-            
-            // Launch confetti for success
-            fireConfetti();
-            resetBtn.style.display = 'block';
-        }
-
-        function fireConfetti() {
-            for(let i=0; i<30; i++) {
-                const conf = document.createElement('div');
-                conf.classList.add('confetti');
-                conf.style.left = (Math.random() * 300) + 'px'; // Random horizontal
-                conf.style.backgroundColor = ['#f00', '#0f0', '#00f', '#ff0', '#f0f'][Math.floor(Math.random()*5)];
-                conf.style.animation = `fall ${1 + Math.random()}s linear forwards`;
-                
-                // Add falling animation dynamically
-                const styleSheet = document.createElement("style");
-                styleSheet.innerText = `@keyframes fall { 0% {top: -50px; transform: rotate(0deg);} 100% {top: 300px; transform: rotate(720deg);} }`;
-                document.head.appendChild(styleSheet);
-                
-                document.querySelector('.toaster-container').appendChild(conf);
-                
-                // Cleanup
-                setTimeout(() => conf.remove(), 2000);
-            }
+            }, 1200); // Slightly longer wait for suspense
         }
 
         function resetToaster() {
             isToasting = false;
-            isStuck = false;
-            toast.className = 'toast'; // Removes all extra classes
+            
+            // Reset Positions
+            toast.classList.remove('popped');
             handle.classList.remove('knob-down');
+            toasterRig.classList.remove('container-shake');
+            
+            // Remove all specific classes
+            toast.classList.remove('normal', 'stuck', 'perfect', 'burnt', 'electro', 'raw');
+            
+            // Reset Effects
+            bolts.forEach(b => b.classList.remove('zap-active'));
+            smokeParticles.forEach(s => s.classList.remove('smoke-active'));
+            halo.style.opacity = '0';
+            
+            // Reset Text & Face
             display.classList.remove('visible');
             resetBtn.style.display = 'none';
             face.innerText = "o_o";
-            
-            sunglasses.style.display = 'none';
-            butter.classList.remove('butter-active');
-            bolts.forEach(b => b.classList.remove('zap-active'));
         }
     </script>
 </body>
