@@ -1,1062 +1,991 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Trash2, RotateCw, StickyNote } from 'lucide-react';
-
-const CircuitDiagramBuilder = () => {
-  const [components, setComponents] = useState([]);
-  const [wires, setWires] = useState([]);
-  const [selectedComponent, setSelectedComponent] = useState(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isDrawingWire, setIsDrawingWire] = useState(false);
-  const [wireStart, setWireStart] = useState(null);
-  const [currentWireEnd, setCurrentWireEnd] = useState(null);
-  const [showNotes, setShowNotes] = useState(false);
-  const [componentValues, setComponentValues] = useState({});
-  const [componentCounts, setComponentCounts] = useState({
-    R: 0, D: 0, LED: 0, C: 0, Q: 0, V: 0, T: 0, L: 0, SW: 0, GND: 0, OP: 0, OPP: 0
-  });
-  
-  const canvasRef = useRef(null);
-  const containerRef = useRef(null);
-  const gridSize = 20;
-  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 1200 });
-
-  useEffect(() => {
-    const updateCanvasSize = () => {
-      if (containerRef.current) {
-        const width = window.innerWidth;
-        const height = window.innerHeight - 100; // Account for toolbar
-        
-        // For mobile devices
-        if (width < 768) {
-          setCanvasSize({ width: width - 20, height: Math.max(height, 1000) });
-        } else {
-          // For desktop
-          setCanvasSize({ width: Math.max(1200, width - 40), height: Math.max(800, height) });
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Circuit Diagram Builder</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            touch-action: none;
         }
-      }
-    };
-
-    updateCanvasSize();
-    window.addEventListener('resize', updateCanvasSize);
-    return () => window.removeEventListener('resize', updateCanvasSize);
-  }, []);
-
-  const componentTypes = [
-    { type: 'R', name: 'Resistor', unit: 'Ω' },
-    { type: 'D', name: 'Diode', unit: '' },
-    { type: 'LED', name: 'LED', unit: '' },
-    { type: 'C', name: 'Capacitor', unit: 'F' },
-    { type: 'Q', name: 'NPN', unit: '' },
-    { type: 'Q', name: 'PNP', unit: '', subtype: 'pnp' },
-    { type: 'V', name: 'DC Supply', unit: 'V', subtype: 'dc' },
-    { type: 'V', name: 'AC Supply', unit: 'V', subtype: 'ac' },
-    { type: 'I', name: 'Current Source', unit: 'A' },
-    { type: 'T', name: 'Transformer', unit: '' },
-    { type: 'L', name: 'Inductor', unit: 'H' },
-    { type: 'SW', name: 'Switch', unit: '' },
-    { type: 'GND', name: 'Ground', unit: '' },
-    { type: 'OP', name: 'Op-Amp', unit: '' },
-    { type: 'OPP', name: 'Op-Amp (Power)', unit: '' }
-  ];
-
-  const unitPrefixes = [
-    { value: 1e-12, label: 'p' },
-    { value: 1e-9, label: 'n' },
-    { value: 1e-6, label: 'µ' },
-    { value: 1e-3, label: 'm' },
-    { value: 1, label: '' },
-    { value: 1e3, label: 'k' },
-    { value: 1e6, label: 'M' }
-  ];
-
-  const snapToGrid = (value) => Math.round(value / gridSize) * gridSize;
-
-  const addComponent = (type, subtype = null) => {
-    const count = componentCounts[type] + 1;
-    const id = `${type}${count}`;
+        #root {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
     
-    setComponentCounts(prev => ({ ...prev, [type]: count }));
-    
-    const newComponent = {
-      id,
-      type,
-      subtype,
-      x: 200,
-      y: 200,
-      rotation: 0,
-      label: id
-    };
-    
-    setComponents([...components, newComponent]);
-    
-    // Initialize component values differently for transformers
-    if (type === 'T') {
-      setComponentValues(prev => ({
-        ...prev,
-        [id]: { primary: '', secondary: '' }
-      }));
-    } else {
-      setComponentValues(prev => ({
-        ...prev,
-        [id]: { value: '', prefix: 1 }
-      }));
-    }
-  };
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
 
-  const drawComponent = (ctx, comp, values) => {
-    ctx.save();
-    ctx.translate(comp.x, comp.y);
-    ctx.rotate((comp.rotation * Math.PI) / 180);
-    ctx.strokeStyle = '#000';
-    ctx.fillStyle = '#000';
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+        // Lucide React icons as inline SVG components
+        const RotateCw = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+        );
 
-    const size = 40;
+        const Trash2 = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+            </svg>
+        );
 
-    switch (comp.type) {
-      case 'R': // Resistor - zigzag
-        ctx.beginPath();
-        ctx.moveTo(-size, 0);
-        ctx.lineTo(-20, 0);
-        ctx.lineTo(-15, -8);
-        ctx.lineTo(-5, 8);
-        ctx.lineTo(5, -8);
-        ctx.lineTo(15, 8);
-        ctx.lineTo(20, 0);
-        ctx.lineTo(size, 0);
-        ctx.stroke();
-        break;
+        const StickyNote = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15.5 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z"></path>
+                <path d="M15 3v6h6"></path>
+            </svg>
+        );
 
-      case 'D': // Diode - clean triangle
-        ctx.beginPath();
-        ctx.moveTo(-size, 0);
-        ctx.lineTo(-8, 0);
-        ctx.stroke();
-        
-        ctx.beginPath();
-        ctx.moveTo(-8, -10);
-        ctx.lineTo(-8, 10);
-        ctx.lineTo(8, 0);
-        ctx.closePath();
-        ctx.fill();
-        
-        ctx.beginPath();
-        ctx.moveTo(8, -10);
-        ctx.lineTo(8, 10);
-        ctx.stroke();
-        
-        ctx.beginPath();
-        ctx.moveTo(8, 0);
-        ctx.lineTo(size, 0);
-        ctx.stroke();
-        break;
-
-      case 'LED': // LED with arrows
-        ctx.beginPath();
-        ctx.moveTo(-size, 0);
-        ctx.lineTo(-8, 0);
-        ctx.stroke();
-        
-        ctx.beginPath();
-        ctx.moveTo(-8, -10);
-        ctx.lineTo(-8, 10);
-        ctx.lineTo(8, 0);
-        ctx.closePath();
-        ctx.fill();
-        
-        ctx.beginPath();
-        ctx.moveTo(8, -10);
-        ctx.lineTo(8, 10);
-        ctx.stroke();
-        
-        ctx.beginPath();
-        ctx.moveTo(8, 0);
-        ctx.lineTo(size, 0);
-        ctx.stroke();
-        
-        // Two arrows
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(5, -15);
-        ctx.lineTo(12, -22);
-        ctx.moveTo(10, -20);
-        ctx.lineTo(12, -22);
-        ctx.lineTo(10, -24);
-        ctx.moveTo(10, -15);
-        ctx.lineTo(17, -22);
-        ctx.moveTo(15, -20);
-        ctx.lineTo(17, -22);
-        ctx.lineTo(15, -24);
-        ctx.stroke();
-        ctx.lineWidth = 2;
-        break;
-
-      case 'C': // Capacitor - two parallel lines
-        ctx.beginPath();
-        ctx.moveTo(-size, 0);
-        ctx.lineTo(-3, 0);
-        ctx.moveTo(-3, -16);
-        ctx.lineTo(-3, 16);
-        ctx.moveTo(3, -16);
-        ctx.lineTo(3, 16);
-        ctx.moveTo(3, 0);
-        ctx.lineTo(size, 0);
-        ctx.stroke();
-        break;
-
-      case 'Q': // Transistor NPN/PNP - clean recognizable design
-        // Circle
-        ctx.beginPath();
-        ctx.arc(0, 0, 20, 0, 2 * Math.PI);
-        ctx.stroke();
-        
-        // Base line (vertical on left)
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(-10, -14);
-        ctx.lineTo(-10, 14);
-        ctx.stroke();
-        ctx.lineWidth = 2;
-        
-        // Base connection
-        ctx.beginPath();
-        ctx.moveTo(-size, 0);
-        ctx.lineTo(-10, 0);
-        ctx.stroke();
-        
-        // Collector (top) and Emitter (bottom) lines
-        ctx.beginPath();
-        ctx.moveTo(-10, -8);
-        ctx.lineTo(8, -20);
-        ctx.lineTo(8, -size);
-        ctx.moveTo(-10, 8);
-        ctx.lineTo(8, 20);
-        ctx.lineTo(8, size);
-        ctx.stroke();
-        break;
-
-      case 'V': // Power supply
-        ctx.beginPath();
-        ctx.arc(0, 0, 18, 0, 2 * Math.PI);
-        ctx.stroke();
-        
-        if (comp.subtype === 'ac') {
-          ctx.beginPath();
-          ctx.moveTo(-10, 0);
-          for (let i = -10; i <= 10; i += 1) {
-            ctx.lineTo(i, Math.sin(i / 3) * 8);
-          }
-          ctx.stroke();
-        } else {
-          // DC - show polarity aligned with wire positions (left and right)
-          ctx.font = 'bold 14px Arial';
-          ctx.textAlign = 'center';
-          ctx.fillText('+', -8, 3);
-          ctx.fillText('−', 8, 3);
-        }
-        
-        ctx.beginPath();
-        ctx.moveTo(-size, 0);
-        ctx.lineTo(-18, 0);
-        ctx.moveTo(18, 0);
-        ctx.lineTo(size, 0);
-        ctx.stroke();
-        break;
-
-      case 'I': // Current source - arrow in line
-        ctx.beginPath();
-        ctx.arc(0, 0, 18, 0, 2 * Math.PI);
-        ctx.stroke();
-        
-        // Horizontal line through circle with arrow
-        ctx.beginPath();
-        ctx.moveTo(-size, 0);
-        ctx.lineTo(-18, 0);
-        ctx.moveTo(-10, 0);
-        ctx.lineTo(10, 0);
-        ctx.stroke();
-        
-        // Arrow head pointing right
-        ctx.beginPath();
-        ctx.moveTo(10, 0);
-        ctx.lineTo(6, -4);
-        ctx.moveTo(10, 0);
-        ctx.lineTo(6, 4);
-        ctx.stroke();
-        
-        ctx.beginPath();
-        ctx.moveTo(18, 0);
-        ctx.lineTo(size, 0);
-        ctx.stroke();
-        break;
-
-      case 'T': // Transformer - clean parallel coils
-        ctx.lineWidth = 2;
-        
-        // Left coil (vertical) - more compact
-        ctx.beginPath();
-        ctx.moveTo(-15, -size);
-        ctx.lineTo(-15, -20);
-        // 4 tight loops
-        for (let i = 0; i < 4; i++) {
-          ctx.arc(-15, -20 + i * 6 + 3, 3, 0, Math.PI, true);
-        }
-        ctx.lineTo(-15, -20 + 24);
-        ctx.lineTo(-15, size);
-        ctx.stroke();
-        
-        // Right coil (vertical) - more compact
-        ctx.beginPath();
-        ctx.moveTo(15, -size);
-        ctx.lineTo(15, -20);
-        // 4 tight loops
-        for (let i = 0; i < 4; i++) {
-          ctx.arc(15, -20 + i * 6 + 3, 3, 0, Math.PI, true);
-        }
-        ctx.lineTo(15, -20 + 24);
-        ctx.lineTo(15, size);
-        ctx.stroke();
-        
-        // Two parallel vertical lines in center (core)
-        ctx.beginPath();
-        ctx.moveTo(0, -28);
-        ctx.lineTo(0, 28);
-        ctx.moveTo(3, -28);
-        ctx.lineTo(3, 28);
-        ctx.stroke();
-        break;
-
-      case 'L': // Inductor - cleaner coil
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(-size, 0);
-        ctx.lineTo(-32, 0);
-        
-        // Draw 4 smooth semicircles
-        for (let i = 0; i < 4; i++) {
-          ctx.arc(-32 + i * 10 + 5, 0, 5, Math.PI, 0, false);
-        }
-        
-        ctx.lineTo(size, 0);
-        ctx.stroke();
-        break;
-
-      case 'SW': // Switch
-        ctx.beginPath();
-        ctx.moveTo(-size, 0);
-        ctx.lineTo(-8, 0);
-        ctx.stroke();
-        
-        ctx.beginPath();
-        ctx.arc(-8, 0, 2.5, 0, 2 * Math.PI);
-        ctx.fill();
-        
-        ctx.beginPath();
-        ctx.moveTo(-8, 0);
-        ctx.lineTo(8, 10);
-        ctx.stroke();
-        
-        ctx.beginPath();
-        ctx.arc(8, 0, 2.5, 0, 2 * Math.PI);
-        ctx.fill();
-        
-        ctx.beginPath();
-        ctx.moveTo(8, 0);
-        ctx.lineTo(size, 0);
-        ctx.stroke();
-        break;
-
-      case 'GND': // Ground
-        ctx.beginPath();
-        ctx.moveTo(0, -size);
-        ctx.lineTo(0, 0);
-        ctx.stroke();
-        
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.moveTo(-15, 0);
-        ctx.lineTo(15, 0);
-        ctx.moveTo(-10, 5);
-        ctx.lineTo(10, 5);
-        ctx.moveTo(-5, 10);
-        ctx.lineTo(5, 10);
-        ctx.stroke();
-        ctx.lineWidth = 2;
-        break;
-
-      case 'OPP': // Op-Amp with Power - same as OP but with power pins
-      case 'OP': // Op-Amp
-        ctx.beginPath();
-        ctx.moveTo(-25, -20);
-        ctx.lineTo(25, 0);
-        ctx.lineTo(-25, 20);
-        ctx.closePath();
-        ctx.stroke();
-        
-        // Plus symbol (non-inverting)
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(-18, -12);
-        ctx.lineTo(-12, -12);
-        ctx.moveTo(-15, -15);
-        ctx.lineTo(-15, -9);
-        ctx.stroke();
-        
-        // Minus symbol (inverting)
-        ctx.beginPath();
-        ctx.moveTo(-18, 12);
-        ctx.lineTo(-12, 12);
-        ctx.stroke();
-        ctx.lineWidth = 2;
-        
-        // Connections
-        ctx.beginPath();
-        ctx.moveTo(-25, -12);
-        ctx.lineTo(-size, -12);
-        ctx.moveTo(-25, 12);
-        ctx.lineTo(-size, 12);
-        ctx.moveTo(25, 0);
-        ctx.lineTo(size, 0);
-        ctx.stroke();
-        
-        // If power supply variant, add V+ and V- pins
-        if (comp.type === 'OPP') {
-          ctx.beginPath();
-          ctx.moveTo(0, -20);
-          ctx.lineTo(0, -30);
-          ctx.moveTo(0, 20);
-          ctx.lineTo(0, 30);
-          ctx.stroke();
-          
-          // V+ label
-          ctx.font = '10px Arial';
-          ctx.fillStyle = '#000';
-          ctx.textAlign = 'center';
-          ctx.fillText('V+', 10, -18);
-          ctx.fillText('V-', 10, 28);
-        }
-        break;
-    }
-
-    // Draw connection points
-    ctx.fillStyle = '#ff0000';
-    const points = getConnectionPoints(comp);
-    points.forEach(point => {
-      ctx.beginPath();
-      ctx.arc(point.dx, point.dy, 3, 0, 2 * Math.PI);
-      ctx.fill();
-    });
-
-    ctx.restore();
-
-    // Draw label
-    ctx.fillStyle = '#0066cc';
-    ctx.font = 'bold 14px Arial';
-    ctx.textAlign = 'center';
-    
-    // For transistors, move label to the left to avoid interference
-    if (comp.type === 'Q') {
-      ctx.fillText(comp.label, comp.x - 25, comp.y - 25);
-    } else if (comp.type === 'GND') {
-      // For ground, put label at the bottom
-      ctx.fillText(comp.label, comp.x, comp.y + 25);
-    } else if (comp.type === 'OPP') {
-      // For op-amp with power, move label to the right
-      ctx.fillText(comp.label, comp.x - 35, comp.y - 25);
-    } else {
-      ctx.fillText(comp.label, comp.x, comp.y - 35);
-    }
-    
-    // Draw value/type if it exists
-    if (comp.type === 'Q') {
-      // For transistors, show NPN or PNP below and to the left
-      const transistorType = comp.subtype === 'pnp' ? 'PNP' : 'NPN';
-      ctx.fillStyle = '#cc0000';
-      ctx.font = 'bold 13px Arial';
-      ctx.fillText(transistorType, comp.x - 25, comp.y + 35);
-    } else if (componentValues[comp.id]) {
-      const value = componentValues[comp.id].value;
-      const prefix = componentValues[comp.id].prefix;
-      
-      if (value) {
-        let unitSymbol = '';
-        if (comp.type === 'R') unitSymbol = 'Ω';
-        else if (comp.type === 'C') unitSymbol = 'F';
-        else if (comp.type === 'L') unitSymbol = 'H';
-        else if (comp.type === 'I') unitSymbol = 'A';
-        else if (comp.type === 'V') unitSymbol = 'V';
-        
-        // Find prefix label
-        const prefixLabel = unitPrefixes.find(p => p.value === prefix)?.label || '';
-        const valueText = `${value} ${prefixLabel}${unitSymbol}`;
-        
-        ctx.fillStyle = '#cc0000';
-        ctx.font = 'bold 13px Arial';
-        ctx.fillText(valueText, comp.x, comp.y + 38);
-      }
-    }
-  };
-
-  const getConnectionPoints = (comp) => {
-    const size = 40;
-    let points = [];
-
-    switch (comp.type) {
-      case 'Q': // Transistor - Base, Collector, Emitter
-        const angle = comp.rotation * Math.PI / 180;
-        points = [
-          { 
-            dx: -size * Math.cos(angle), 
-            dy: -size * Math.sin(angle), 
-            label: 'B' 
-          },
-          { 
-            dx: 8 * Math.cos(angle) + (-size) * Math.sin(angle), 
-            dy: 8 * Math.sin(angle) - (-size) * Math.cos(angle), 
-            label: 'C' 
-          },
-          { 
-            dx: 8 * Math.cos(angle) + size * Math.sin(angle), 
-            dy: 8 * Math.sin(angle) - size * Math.cos(angle), 
-            label: 'E' 
-          }
-        ];
-        break;
-      case 'T': // Transformer - top and bottom of each coil
-        const tAngle = comp.rotation * Math.PI / 180;
-        points = [
-          { 
-            dx: -15 * Math.cos(tAngle) + (-size) * Math.sin(tAngle), 
-            dy: -15 * Math.sin(tAngle) - (-size) * Math.cos(tAngle), 
-            label: 'L1-top' 
-          },
-          { 
-            dx: -15 * Math.cos(tAngle) + size * Math.sin(tAngle), 
-            dy: -15 * Math.sin(tAngle) - size * Math.cos(tAngle), 
-            label: 'L1-bot' 
-          },
-          { 
-            dx: 15 * Math.cos(tAngle) + (-size) * Math.sin(tAngle), 
-            dy: 15 * Math.sin(tAngle) - (-size) * Math.cos(tAngle), 
-            label: 'L2-top' 
-          },
-          { 
-            dx: 15 * Math.cos(tAngle) + size * Math.sin(tAngle), 
-            dy: 15 * Math.sin(tAngle) - size * Math.cos(tAngle), 
-            label: 'L2-bot' 
-          }
-        ];
-        break;
-      case 'OPP': // Op-Amp with power - inputs, output, and power pins
-      case 'OP': // Op-Amp - inputs and output
-        const opAngle = comp.rotation * Math.PI / 180;
-        if (comp.type === 'OPP') {
-          points = [
-            { 
-              dx: -size * Math.cos(opAngle) + (-12) * Math.sin(opAngle), 
-              dy: -size * Math.sin(opAngle) - (-12) * Math.cos(opAngle), 
-              label: '+' 
-            },
-            { 
-              dx: -size * Math.cos(opAngle) + 12 * Math.sin(opAngle), 
-              dy: -size * Math.sin(opAngle) - 12 * Math.cos(opAngle), 
-              label: '-' 
-            },
-            { 
-              dx: size * Math.cos(opAngle), 
-              dy: size * Math.sin(opAngle), 
-              label: 'out' 
-            },
-            { 
-              dx: 0 * Math.cos(opAngle) + (-30) * Math.sin(opAngle), 
-              dy: 0 * Math.sin(opAngle) - (-30) * Math.cos(opAngle), 
-              label: 'V+' 
-            },
-            { 
-              dx: 0 * Math.cos(opAngle) + 30 * Math.sin(opAngle), 
-              dy: 0 * Math.sin(opAngle) - 30 * Math.cos(opAngle), 
-              label: 'V-' 
-            }
-          ];
-        } else {
-          points = [
-            { 
-              dx: -size * Math.cos(opAngle) + (-12) * Math.sin(opAngle), 
-              dy: -size * Math.sin(opAngle) - (-12) * Math.cos(opAngle), 
-              label: '+' 
-            },
-            { 
-              dx: -size * Math.cos(opAngle) + 12 * Math.sin(opAngle), 
-              dy: -size * Math.sin(opAngle) - 12 * Math.cos(opAngle), 
-              label: '-' 
-            },
-            { 
-              dx: size * Math.cos(opAngle), 
-              dy: size * Math.sin(opAngle), 
-              label: 'out' 
-            }
-          ];
-        }
-        break;
-      case 'GND': // Ground - only top connection
-        const gndAngle = comp.rotation * Math.PI / 180;
-        points = [
-          { 
-            dx: 0 * Math.cos(gndAngle) + (-size) * Math.sin(gndAngle), 
-            dy: 0 * Math.sin(gndAngle) - (-size) * Math.cos(gndAngle), 
-            label: 'top' 
-          }
-        ];
-        break;
-      default:
-        points = [
-          { dx: -size * Math.cos(comp.rotation * Math.PI / 180), 
-            dy: -size * Math.sin(comp.rotation * Math.PI / 180), label: 'left' },
-          { dx: size * Math.cos(comp.rotation * Math.PI / 180), 
-            dy: size * Math.sin(comp.rotation * Math.PI / 180), label: 'right' }
-        ];
-    }
-
-    return points.map(p => ({
-      x: comp.x + p.dx,
-      y: comp.y + p.dy,
-      label: p.label
-    }));
-  };
-
-  const handleCanvasMouseDown = (e) => {
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    // Check if clicking on a component
-    const clickedComp = components.find(comp => {
-      const dx = x - comp.x;
-      const dy = y - comp.y;
-      return Math.sqrt(dx * dx + dy * dy) < 30;
-    });
-
-    if (clickedComp) {
-      // If clicking on already selected component, start dragging
-      // If clicking on a different component, select it
-      if (selectedComponent === clickedComp.id) {
-        setIsDragging(true);
-      } else {
-        setSelectedComponent(clickedComp.id);
-        setIsDragging(true);
-      }
-      return;
-    }
-
-    // Clicking on empty space deselects
-    setSelectedComponent(null);
-
-    // Check if clicking on a connection point to start wire
-    for (const comp of components) {
-      const points = getConnectionPoints(comp);
-      for (const point of points) {
-        const dx = x - point.x;
-        const dy = y - point.y;
-        if (Math.sqrt(dx * dx + dy * dy) < 8) {
-          setIsDrawingWire(true);
-          setWireStart({ x: point.x, y: point.y, compId: comp.id });
-          setCurrentWireEnd({ x, y });
-          return;
-        }
-      }
-    }
-
-    // Start drawing wire from empty space
-    setIsDrawingWire(true);
-    setWireStart({ x: snapToGrid(x), y: snapToGrid(y), compId: null });
-    setCurrentWireEnd({ x, y });
-  };
-
-  const handleCanvasMouseMove = (e) => {
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    if (isDragging && selectedComponent) {
-      setComponents(components.map(comp =>
-        comp.id === selectedComponent
-          ? { ...comp, x: snapToGrid(x), y: snapToGrid(y) }
-          : comp
-      ));
-    }
-
-    if (isDrawingWire) {
-      setCurrentWireEnd({ x, y });
-    }
-  };
-
-  const handleCanvasMouseUp = (e) => {
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    if (isDrawingWire && wireStart) {
-      let endPoint = { x: snapToGrid(x), y: snapToGrid(y), compId: null };
-
-      // Check if ending on a connection point
-      for (const comp of components) {
-        const points = getConnectionPoints(comp);
-        for (const point of points) {
-          const dx = x - point.x;
-          const dy = y - point.y;
-          if (Math.sqrt(dx * dx + dy * dy) < 8) {
-            endPoint = { x: point.x, y: point.y, compId: comp.id };
-            break;
-          }
-        }
-      }
-
-      setWires([...wires, { start: wireStart, end: endPoint }]);
-      setIsDrawingWire(false);
-      setWireStart(null);
-      setCurrentWireEnd(null);
-    }
-
-    if (isDragging) {
-      setIsDragging(false);
-      // Deselect after dragging is complete
-      setSelectedComponent(null);
-    }
-  };
-
-  const rotateComponent = () => {
-    if (selectedComponent) {
-      setComponents(components.map(comp =>
-        comp.id === selectedComponent
-          ? { ...comp, rotation: (comp.rotation + 90) % 360 }
-          : comp
-      ));
-    }
-  };
-
-  const deleteSelected = () => {
-    if (selectedComponent) {
-      setComponents(components.filter(comp => comp.id !== selectedComponent));
-      setWires(wires.filter(wire => 
-        wire.start.compId !== selectedComponent && wire.end.compId !== selectedComponent
-      ));
-      setSelectedComponent(null);
-    }
-  };
-
-  const undoLastAction = () => {
-    if (wires.length > 0) {
-      // Remove last wire
-      setWires(wires.slice(0, -1));
-    } else if (components.length > 0) {
-      // Remove last component
-      const lastComp = components[components.length - 1];
-      setComponents(components.slice(0, -1));
-      
-      // Decrease the counter for that component type
-      setComponentCounts(prev => ({
-        ...prev,
-        [lastComp.type]: Math.max(0, prev[lastComp.type] - 1)
-      }));
-      
-      // Remove from componentValues
-      const newValues = { ...componentValues };
-      delete newValues[lastComp.id];
-      setComponentValues(newValues);
-    }
-  };
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    
-    // Clear canvas
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw grid
-    ctx.strokeStyle = '#f0f0f0';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < canvas.width; i += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(i, 0);
-      ctx.lineTo(i, canvas.height);
-      ctx.stroke();
-    }
-    for (let i = 0; i < canvas.height; i += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(0, i);
-      ctx.lineTo(canvas.width, i);
-      ctx.stroke();
-    }
-
-    // Draw wires
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 2;
-    wires.forEach(wire => {
-      ctx.beginPath();
-      ctx.moveTo(wire.start.x, wire.start.y);
-      ctx.lineTo(wire.end.x, wire.end.y);
-      ctx.stroke();
-      
-      // Draw dots at wire ends
-      ctx.fillStyle = '#000';
-      ctx.beginPath();
-      ctx.arc(wire.start.x, wire.start.y, 3, 0, 2 * Math.PI);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(wire.end.x, wire.end.y, 3, 0, 2 * Math.PI);
-      ctx.fill();
-    });
-
-    // Draw temporary wire
-    if (isDrawingWire && wireStart && currentWireEnd) {
-      ctx.strokeStyle = '#666';
-      ctx.setLineDash([5, 5]);
-      ctx.beginPath();
-      ctx.moveTo(wireStart.x, wireStart.y);
-      ctx.lineTo(currentWireEnd.x, currentWireEnd.y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    // Draw components
-    components.forEach(comp => {
-      if (comp.id === selectedComponent) {
-        ctx.save();
-        ctx.strokeStyle = '#0066cc';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]);
-        ctx.strokeRect(comp.x - 35, comp.y - 35, 70, 70);
-        ctx.setLineDash([]);
-        ctx.restore();
-      }
-      drawComponent(ctx, comp, componentValues);
-      
-      // Draw transformer ratio separately
-      if (comp.type === 'T' && componentValues[comp.id]) {
-        const vals = componentValues[comp.id];
-        if (vals.primary && vals.secondary) {
-          ctx.fillStyle = '#cc0000';
-          ctx.font = 'bold 13px Arial';
-          ctx.textAlign = 'center';
-          ctx.fillText(`${vals.primary}:${vals.secondary}`, comp.x, comp.y + 50);
-        }
-      }
-    });
-  }, [components, wires, selectedComponent, isDrawingWire, wireStart, currentWireEnd, componentValues, canvasSize]);
-
-  return (
-    <div className="w-full h-screen bg-gray-50 flex flex-col overflow-hidden">
-      {/* Toolbar - Scrollable horizontally on mobile */}
-      <div className="bg-white border-b border-gray-200 p-2 overflow-x-auto">
-        <div className="flex items-center gap-1.5 min-w-max pb-1">
-          <div className="font-semibold text-gray-700 text-xs mr-2 whitespace-nowrap">Components:</div>
-          {componentTypes.map((comp, idx) => (
-            <button
-              key={idx}
-              onClick={() => addComponent(comp.type, comp.subtype)}
-              className="px-2 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition whitespace-nowrap flex-shrink-0"
-            >
-              {comp.name}
-            </button>
-          ))}
-          
-          <div className="ml-2 flex gap-1.5 border-l pl-2 border-gray-300">
-            <button
-              onClick={undoLastAction}
-              className="px-2 py-1.5 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 transition whitespace-nowrap"
-              title="Undo last action"
-            >
-              Undo
-            </button>
-            <button
-              onClick={rotateComponent}
-              disabled={!selectedComponent}
-              className="p-1.5 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Rotate (90°)"
-            >
-              <RotateCw size={16} />
-            </button>
-            <button
-              onClick={deleteSelected}
-              disabled={!selectedComponent}
-              className="p-1.5 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Delete"
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Canvas - Touch enabled for mobile */}
-      <div ref={containerRef} className="flex-1 relative overflow-auto">
-        <canvas
-          ref={canvasRef}
-          width={canvasSize.width}
-          height={canvasSize.height}
-          onMouseDown={handleCanvasMouseDown}
-          onMouseMove={handleCanvasMouseMove}
-          onMouseUp={handleCanvasMouseUp}
-          onTouchStart={(e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            const rect = canvasRef.current.getBoundingClientRect();
-            const mouseEvent = new MouseEvent('mousedown', {
-              clientX: touch.clientX,
-              clientY: touch.clientY
+        const CircuitDiagramBuilder = () => {
+            const [components, setComponents] = useState([]);
+            const [wires, setWires] = useState([]);
+            const [selectedComponent, setSelectedComponent] = useState(null);
+            const [isDragging, setIsDragging] = useState(false);
+            const [isDrawingWire, setIsDrawingWire] = useState(false);
+            const [wireStart, setWireStart] = useState(null);
+            const [currentWireEnd, setCurrentWireEnd] = useState(null);
+            const [showNotes, setShowNotes] = useState(false);
+            const [componentValues, setComponentValues] = useState({});
+            const [componentCounts, setComponentCounts] = useState({
+                R: 0, D: 0, LED: 0, C: 0, Q: 0, V: 0, T: 0, L: 0, SW: 0, GND: 0, OP: 0, OPP: 0, I: 0
             });
-            handleCanvasMouseDown(mouseEvent);
-          }}
-          onTouchMove={(e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            const mouseEvent = new MouseEvent('mousemove', {
-              clientX: touch.clientX,
-              clientY: touch.clientY
-            });
-            handleCanvasMouseMove(mouseEvent);
-          }}
-          onTouchEnd={(e) => {
-            e.preventDefault();
-            const mouseEvent = new MouseEvent('mouseup', {
-              clientX: e.changedTouches[0].clientX,
-              clientY: e.changedTouches[0].clientY
-            });
-            handleCanvasMouseUp(mouseEvent);
-          }}
-          className="cursor-crosshair touch-none bg-white"
-          style={{ touchAction: 'none' }}
-        />
-      </div>
+            
+            const canvasRef = useRef(null);
+            const containerRef = useRef(null);
+            const gridSize = 20;
+            const [canvasSize, setCanvasSize] = useState({ width: 800, height: 1200 });
 
-      {/* Sticky Note - Optimized for mobile */}
-      <div className={`fixed bottom-2 right-2 bg-yellow-100 border-2 border-yellow-300 rounded shadow-lg transition-all ${showNotes ? 'w-11/12 max-w-sm' : 'w-10'} z-50`}>
-        <div 
-          className="bg-yellow-200 p-2 cursor-pointer flex items-center justify-between"
-          onClick={() => setShowNotes(!showNotes)}
-        >
-          <StickyNote size={16} />
-          {showNotes && <span className="font-semibold text-sm">Values</span>}
-        </div>
-        
-        {showNotes && (
-          <div className="p-2 max-h-64 overflow-y-auto">
-            {components.map(comp => {
-              const compType = componentTypes.find(ct => ct.type === comp.type && ct.subtype === comp.subtype);
-              
-              // Skip value input for transistors
-              if (comp.type === 'Q') {
-                return (
-                  <div key={comp.id} className="mb-2 pb-2 border-b border-yellow-300 last:border-0">
-                    <div className="font-semibold text-xs">{comp.label} - {comp.subtype === 'pnp' ? 'PNP' : 'NPN'}</div>
-                  </div>
-                );
-              }
-              
-              // Skip value input for ground and switch
-              if (comp.type === 'GND' || comp.type === 'SW') {
-                return (
-                  <div key={comp.id} className="mb-2 pb-2 border-b border-yellow-300 last:border-0">
-                    <div className="font-semibold text-xs">{comp.label}</div>
-                  </div>
-                );
-              }
-              
-              // Transformer - show turns ratio input
-              if (comp.type === 'T') {
-                return (
-                  <div key={comp.id} className="mb-2 pb-2 border-b border-yellow-300 last:border-0">
-                    <div className="font-semibold text-xs mb-1">{comp.label}</div>
-                    <div className="flex gap-1 items-center">
-                      <input
-                        type="text"
-                        placeholder="Pri"
-                        value={componentValues[comp.id]?.primary || ''}
-                        onChange={(e) => setComponentValues(prev => ({
-                          ...prev,
-                          [comp.id]: { ...prev[comp.id], primary: e.target.value }
-                        }))}
-                        className="w-14 px-1 py-1 text-xs border border-gray-300 rounded"
-                      />
-                      <span className="text-xs font-semibold">:</span>
-                      <input
-                        type="text"
-                        placeholder="Sec"
-                        value={componentValues[comp.id]?.secondary || ''}
-                        onChange={(e) => setComponentValues(prev => ({
-                          ...prev,
-                          [comp.id]: { ...prev[comp.id], secondary: e.target.value }
-                        }))}
-                        className="w-14 px-1 py-1 text-xs border border-gray-300 rounded"
-                      />
+            useEffect(() => {
+                const updateCanvasSize = () => {
+                    const width = window.innerWidth;
+                    const height = window.innerHeight - 60;
+                    
+                    if (width < 768) {
+                        setCanvasSize({ width: width - 10, height: Math.max(height, 1000) });
+                    } else {
+                        setCanvasSize({ width: Math.max(1200, width - 40), height: Math.max(800, height) });
+                    }
+                };
+
+                updateCanvasSize();
+                window.addEventListener('resize', updateCanvasSize);
+                return () => window.removeEventListener('resize', updateCanvasSize);
+            }, []);
+
+            const componentTypes = [
+                { type: 'R', name: 'Resistor', unit: 'Ω' },
+                { type: 'D', name: 'Diode', unit: '' },
+                { type: 'LED', name: 'LED', unit: '' },
+                { type: 'C', name: 'Capacitor', unit: 'F' },
+                { type: 'Q', name: 'NPN', unit: '' },
+                { type: 'Q', name: 'PNP', unit: '', subtype: 'pnp' },
+                { type: 'V', name: 'DC Supply', unit: 'V', subtype: 'dc' },
+                { type: 'V', name: 'AC Supply', unit: 'V', subtype: 'ac' },
+                { type: 'I', name: 'Current Source', unit: 'A' },
+                { type: 'T', name: 'Transformer', unit: '' },
+                { type: 'L', name: 'Inductor', unit: 'H' },
+                { type: 'SW', name: 'Switch', unit: '' },
+                { type: 'GND', name: 'Ground', unit: '' },
+                { type: 'OP', name: 'Op-Amp', unit: '' },
+                { type: 'OPP', name: 'Op-Amp (Power)', unit: '' }
+            ];
+
+            const unitPrefixes = [
+                { value: 1e-12, label: 'p' },
+                { value: 1e-9, label: 'n' },
+                { value: 1e-6, label: 'µ' },
+                { value: 1e-3, label: 'm' },
+                { value: 1, label: '' },
+                { value: 1e3, label: 'k' },
+                { value: 1e6, label: 'M' }
+            ];
+
+            const snapToGrid = (value) => Math.round(value / gridSize) * gridSize;
+
+            const addComponent = (type, subtype = null) => {
+                const count = componentCounts[type] + 1;
+                const id = `${type}${count}`;
+                
+                setComponentCounts(prev => ({ ...prev, [type]: count }));
+                
+                const newComponent = {
+                    id,
+                    type,
+                    subtype,
+                    x: 200,
+                    y: 200,
+                    rotation: 0,
+                    label: id
+                };
+                
+                setComponents([...components, newComponent]);
+                
+                if (type === 'T') {
+                    setComponentValues(prev => ({
+                        ...prev,
+                        [id]: { primary: '', secondary: '' }
+                    }));
+                } else {
+                    setComponentValues(prev => ({
+                        ...prev,
+                        [id]: { value: '', prefix: 1 }
+                    }));
+                }
+            };
+
+            const drawComponent = (ctx, comp, values) => {
+                ctx.save();
+                ctx.translate(comp.x, comp.y);
+                ctx.rotate((comp.rotation * Math.PI) / 180);
+                ctx.strokeStyle = '#000';
+                ctx.fillStyle = '#000';
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+
+                const size = 40;
+
+                switch (comp.type) {
+                    case 'R':
+                        ctx.beginPath();
+                        ctx.moveTo(-size, 0);
+                        ctx.lineTo(-20, 0);
+                        ctx.lineTo(-15, -8);
+                        ctx.lineTo(-5, 8);
+                        ctx.lineTo(5, -8);
+                        ctx.lineTo(15, 8);
+                        ctx.lineTo(20, 0);
+                        ctx.lineTo(size, 0);
+                        ctx.stroke();
+                        break;
+
+                    case 'D':
+                        ctx.beginPath();
+                        ctx.moveTo(-size, 0);
+                        ctx.lineTo(-8, 0);
+                        ctx.stroke();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(-8, -10);
+                        ctx.lineTo(-8, 10);
+                        ctx.lineTo(8, 0);
+                        ctx.closePath();
+                        ctx.fill();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(8, -10);
+                        ctx.lineTo(8, 10);
+                        ctx.stroke();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(8, 0);
+                        ctx.lineTo(size, 0);
+                        ctx.stroke();
+                        break;
+
+                    case 'LED':
+                        ctx.beginPath();
+                        ctx.moveTo(-size, 0);
+                        ctx.lineTo(-8, 0);
+                        ctx.stroke();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(-8, -10);
+                        ctx.lineTo(-8, 10);
+                        ctx.lineTo(8, 0);
+                        ctx.closePath();
+                        ctx.fill();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(8, -10);
+                        ctx.lineTo(8, 10);
+                        ctx.stroke();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(8, 0);
+                        ctx.lineTo(size, 0);
+                        ctx.stroke();
+                        
+                        ctx.lineWidth = 1.5;
+                        ctx.beginPath();
+                        ctx.moveTo(5, -15);
+                        ctx.lineTo(12, -22);
+                        ctx.moveTo(10, -20);
+                        ctx.lineTo(12, -22);
+                        ctx.lineTo(10, -24);
+                        ctx.moveTo(10, -15);
+                        ctx.lineTo(17, -22);
+                        ctx.moveTo(15, -20);
+                        ctx.lineTo(17, -22);
+                        ctx.lineTo(15, -24);
+                        ctx.stroke();
+                        ctx.lineWidth = 2;
+                        break;
+
+                    case 'C':
+                        ctx.beginPath();
+                        ctx.moveTo(-size, 0);
+                        ctx.lineTo(-3, 0);
+                        ctx.moveTo(-3, -16);
+                        ctx.lineTo(-3, 16);
+                        ctx.moveTo(3, -16);
+                        ctx.lineTo(3, 16);
+                        ctx.moveTo(3, 0);
+                        ctx.lineTo(size, 0);
+                        ctx.stroke();
+                        break;
+
+                    case 'Q':
+                        ctx.beginPath();
+                        ctx.arc(0, 0, 20, 0, 2 * Math.PI);
+                        ctx.stroke();
+                        
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.moveTo(-10, -14);
+                        ctx.lineTo(-10, 14);
+                        ctx.stroke();
+                        ctx.lineWidth = 2;
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(-size, 0);
+                        ctx.lineTo(-10, 0);
+                        ctx.stroke();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(-10, -8);
+                        ctx.lineTo(8, -20);
+                        ctx.lineTo(8, -size);
+                        ctx.moveTo(-10, 8);
+                        ctx.lineTo(8, 20);
+                        ctx.lineTo(8, size);
+                        ctx.stroke();
+                        break;
+
+                    case 'V':
+                        ctx.beginPath();
+                        ctx.arc(0, 0, 18, 0, 2 * Math.PI);
+                        ctx.stroke();
+                        
+                        if (comp.subtype === 'ac') {
+                            ctx.beginPath();
+                            ctx.moveTo(-10, 0);
+                            for (let i = -10; i <= 10; i += 1) {
+                                ctx.lineTo(i, Math.sin(i / 3) * 8);
+                            }
+                            ctx.stroke();
+                        } else {
+                            ctx.font = 'bold 14px Arial';
+                            ctx.textAlign = 'center';
+                            ctx.fillText('+', -8, 3);
+                            ctx.fillText('−', 8, 3);
+                        }
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(-size, 0);
+                        ctx.lineTo(-18, 0);
+                        ctx.moveTo(18, 0);
+                        ctx.lineTo(size, 0);
+                        ctx.stroke();
+                        break;
+
+                    case 'I':
+                        ctx.beginPath();
+                        ctx.arc(0, 0, 18, 0, 2 * Math.PI);
+                        ctx.stroke();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(-size, 0);
+                        ctx.lineTo(-18, 0);
+                        ctx.moveTo(-10, 0);
+                        ctx.lineTo(10, 0);
+                        ctx.stroke();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(10, 0);
+                        ctx.lineTo(6, -4);
+                        ctx.moveTo(10, 0);
+                        ctx.lineTo(6, 4);
+                        ctx.stroke();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(18, 0);
+                        ctx.lineTo(size, 0);
+                        ctx.stroke();
+                        break;
+
+                    case 'T':
+                        ctx.lineWidth = 2;
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(-15, -size);
+                        ctx.lineTo(-15, -20);
+                        for (let i = 0; i < 4; i++) {
+                            ctx.arc(-15, -20 + i * 6 + 3, 3, 0, Math.PI, true);
+                        }
+                        ctx.lineTo(-15, -20 + 24);
+                        ctx.lineTo(-15, size);
+                        ctx.stroke();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(15, -size);
+                        ctx.lineTo(15, -20);
+                        for (let i = 0; i < 4; i++) {
+                            ctx.arc(15, -20 + i * 6 + 3, 3, 0, Math.PI, true);
+                        }
+                        ctx.lineTo(15, -20 + 24);
+                        ctx.lineTo(15, size);
+                        ctx.stroke();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(0, -28);
+                        ctx.lineTo(0, 28);
+                        ctx.moveTo(3, -28);
+                        ctx.lineTo(3, 28);
+                        ctx.stroke();
+                        break;
+
+                    case 'L':
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(-size, 0);
+                        ctx.lineTo(-32, 0);
+                        
+                        for (let i = 0; i < 4; i++) {
+                            ctx.arc(-32 + i * 10 + 5, 0, 5, Math.PI, 0, false);
+                        }
+                        
+                        ctx.lineTo(size, 0);
+                        ctx.stroke();
+                        break;
+
+                    case 'SW':
+                        ctx.beginPath();
+                        ctx.moveTo(-size, 0);
+                        ctx.lineTo(-8, 0);
+                        ctx.stroke();
+                        
+                        ctx.beginPath();
+                        ctx.arc(-8, 0, 2.5, 0, 2 * Math.PI);
+                        ctx.fill();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(-8, 0);
+                        ctx.lineTo(8, 10);
+                        ctx.stroke();
+                        
+                        ctx.beginPath();
+                        ctx.arc(8, 0, 2.5, 0, 2 * Math.PI);
+                        ctx.fill();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(8, 0);
+                        ctx.lineTo(size, 0);
+                        ctx.stroke();
+                        break;
+
+                    case 'GND':
+                        ctx.beginPath();
+                        ctx.moveTo(0, -size);
+                        ctx.lineTo(0, 0);
+                        ctx.stroke();
+                        
+                        ctx.lineWidth = 2.5;
+                        ctx.beginPath();
+                        ctx.moveTo(-15, 0);
+                        ctx.lineTo(15, 0);
+                        ctx.moveTo(-10, 5);
+                        ctx.lineTo(10, 5);
+                        ctx.moveTo(-5, 10);
+                        ctx.lineTo(5, 10);
+                        ctx.stroke();
+                        ctx.lineWidth = 2;
+                        break;
+
+                    case 'OPP':
+                    case 'OP':
+                        ctx.beginPath();
+                        ctx.moveTo(-25, -20);
+                        ctx.lineTo(25, 0);
+                        ctx.lineTo(-25, 20);
+                        ctx.closePath();
+                        ctx.stroke();
+                        
+                        ctx.lineWidth = 1.5;
+                        ctx.beginPath();
+                        ctx.moveTo(-18, -12);
+                        ctx.lineTo(-12, -12);
+                        ctx.moveTo(-15, -15);
+                        ctx.lineTo(-15, -9);
+                        ctx.stroke();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(-18, 12);
+                        ctx.lineTo(-12, 12);
+                        ctx.stroke();
+                        ctx.lineWidth = 2;
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(-25, -12);
+                        ctx.lineTo(-size, -12);
+                        ctx.moveTo(-25, 12);
+                        ctx.lineTo(-size, 12);
+                        ctx.moveTo(25, 0);
+                        ctx.lineTo(size, 0);
+                        ctx.stroke();
+                        
+                        if (comp.type === 'OPP') {
+                            ctx.beginPath();
+                            ctx.moveTo(0, -20);
+                            ctx.lineTo(0, -30);
+                            ctx.moveTo(0, 20);
+                            ctx.lineTo(0, 30);
+                            ctx.stroke();
+                            
+                            ctx.font = '10px Arial';
+                            ctx.fillStyle = '#000';
+                            ctx.textAlign = 'center';
+                            ctx.fillText('V+', 10, -18);
+                            ctx.fillText('V-', 10, 28);
+                        }
+                        break;
+                }
+
+                const points = getConnectionPoints(comp);
+                ctx.fillStyle = '#ff0000';
+                points.forEach(point => {
+                    ctx.beginPath();
+                    ctx.arc(point.dx, point.dy, 3, 0, 2 * Math.PI);
+                    ctx.fill();
+                });
+
+                ctx.restore();
+
+                ctx.fillStyle = '#0066cc';
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center';
+                
+                if (comp.type === 'Q') {
+                    ctx.fillText(comp.label, comp.x - 25, comp.y - 25);
+                } else if (comp.type === 'GND') {
+                    ctx.fillText(comp.label, comp.x, comp.y + 25);
+                } else if (comp.type === 'OPP') {
+                    ctx.fillText(comp.label, comp.x - 35, comp.y - 25);
+                } else {
+                    ctx.fillText(comp.label, comp.x, comp.y - 35);
+                }
+                
+                if (comp.type === 'Q') {
+                    const transistorType = comp.subtype === 'pnp' ? 'PNP' : 'NPN';
+                    ctx.fillStyle = '#cc0000';
+                    ctx.font = 'bold 13px Arial';
+                    ctx.fillText(transistorType, comp.x - 25, comp.y + 35);
+                } else if (comp.type === 'T') {
+                    const vals = values[comp.id];
+                    if (vals && vals.primary && vals.secondary) {
+                        const ratioText = `${vals.primary}:${vals.secondary}`;
+                        ctx.fillStyle = '#cc0000';
+                        ctx.font = 'bold 13px Arial';
+                        ctx.fillText(ratioText, comp.x, comp.y + 38);
+                    }
+                } else if (values[comp.id]) {
+                    const value = values[comp.id].value;
+                    const prefix = values[comp.id].prefix;
+                    
+                    if (value) {
+                        let unitSymbol = '';
+                        if (comp.type === 'R') unitSymbol = 'Ω';
+                        else if (comp.type === 'C') unitSymbol = 'F';
+                        else if (comp.type === 'L') unitSymbol = 'H';
+                        else if (comp.type === 'I') unitSymbol = 'A';
+                        else if (comp.type === 'V') unitSymbol = 'V';
+                        
+                        const prefixLabel = unitPrefixes.find(p => p.value === prefix)?.label || '';
+                        const valueText = `${value} ${prefixLabel}${unitSymbol}`;
+                        
+                        ctx.fillStyle = '#cc0000';
+                        ctx.font = 'bold 13px Arial';
+                        ctx.fillText(valueText, comp.x, comp.y + 38);
+                    }
+                }
+            };
+
+            const getConnectionPoints = (comp) => {
+                const size = 40;
+                let points = [];
+
+                switch (comp.type) {
+                    case 'Q':
+                        const angle = comp.rotation * Math.PI / 180;
+                        points = [
+                            { dx: -size * Math.cos(angle), dy: -size * Math.sin(angle), label: 'B' },
+                            { dx: 8 * Math.cos(angle) + (-size) * Math.sin(angle), dy: 8 * Math.sin(angle) - (-size) * Math.cos(angle), label: 'C' },
+                            { dx: 8 * Math.cos(angle) + size * Math.sin(angle), dy: 8 * Math.sin(angle) - size * Math.cos(angle), label: 'E' }
+                        ];
+                        break;
+                    case 'T':
+                        const tAngle = comp.rotation * Math.PI / 180;
+                        points = [
+                            { dx: -15 * Math.cos(tAngle) + (-size) * Math.sin(tAngle), dy: -15 * Math.sin(tAngle) - (-size) * Math.cos(tAngle), label: 'L1-top' },
+                            { dx: -15 * Math.cos(tAngle) + size * Math.sin(tAngle), dy: -15 * Math.sin(tAngle) - size * Math.cos(tAngle), label: 'L1-bot' },
+                            { dx: 15 * Math.cos(tAngle) + (-size) * Math.sin(tAngle), dy: 15 * Math.sin(tAngle) - (-size) * Math.cos(tAngle), label: 'L2-top' },
+                            { dx: 15 * Math.cos(tAngle) + size * Math.sin(tAngle), dy: 15 * Math.sin(tAngle) - size * Math.cos(tAngle), label: 'L2-bot' }
+                        ];
+                        break;
+                    case 'OPP':
+                    case 'OP':
+                        const opAngle = comp.rotation * Math.PI / 180;
+                        if (comp.type === 'OPP') {
+                            points = [
+                                { dx: -size * Math.cos(opAngle) + (-12) * Math.sin(opAngle), dy: -size * Math.sin(opAngle) - (-12) * Math.cos(opAngle), label: '+' },
+                                { dx: -size * Math.cos(opAngle) + 12 * Math.sin(opAngle), dy: -size * Math.sin(opAngle) - 12 * Math.cos(opAngle), label: '-' },
+                                { dx: size * Math.cos(opAngle), dy: size * Math.sin(opAngle), label: 'out' },
+                                { dx: 0 * Math.cos(opAngle) + (-30) * Math.sin(opAngle), dy: 0 * Math.sin(opAngle) - (-30) * Math.cos(opAngle), label: 'V+' },
+                                { dx: 0 * Math.cos(opAngle) + 30 * Math.sin(opAngle), dy: 0 * Math.sin(opAngle) - 30 * Math.cos(opAngle), label: 'V-' }
+                            ];
+                        } else {
+                            points = [
+                                { dx: -size * Math.cos(opAngle) + (-12) * Math.sin(opAngle), dy: -size * Math.sin(opAngle) - (-12) * Math.cos(opAngle), label: '+' },
+                                { dx: -size * Math.cos(opAngle) + 12 * Math.sin(opAngle), dy: -size * Math.sin(opAngle) - 12 * Math.cos(opAngle), label: '-' },
+                                { dx: size * Math.cos(opAngle), dy: size * Math.sin(opAngle), label: 'out' }
+                            ];
+                        }
+                        break;
+                    case 'GND':
+                        const gndAngle = comp.rotation * Math.PI / 180;
+                        points = [{ dx: 0 * Math.cos(gndAngle) + (-size) * Math.sin(gndAngle), dy: 0 * Math.sin(gndAngle) - (-size) * Math.cos(gndAngle), label: 'top' }];
+                        break;
+                    default:
+                        points = [
+                            { dx: -size * Math.cos(comp.rotation * Math.PI / 180), dy: -size * Math.sin(comp.rotation * Math.PI / 180), label: 'left' },
+                            { dx: size * Math.cos(comp.rotation * Math.PI / 180), dy: size * Math.sin(comp.rotation * Math.PI / 180), label: 'right' }
+                        ];
+                }
+
+                return points.map(p => ({ x: comp.x + p.dx, y: comp.y + p.dy, label: p.label }));
+            };
+
+            const handleCanvasMouseDown = (e) => {
+                const rect = canvasRef.current.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                const clickedComp = components.find(comp => {
+                    const dx = x - comp.x;
+                    const dy = y - comp.y;
+                    return Math.sqrt(dx * dx + dy * dy) < 30;
+                });
+
+                if (clickedComp) {
+                    if (selectedComponent === clickedComp.id) {
+                        setIsDragging(true);
+                    } else {
+                        setSelectedComponent(clickedComp.id);
+                        setIsDragging(true);
+                    }
+                    return;
+                }
+
+                setSelectedComponent(null);
+
+                for (const comp of components) {
+                    const points = getConnectionPoints(comp);
+                    for (const point of points) {
+                        const dx = x - point.x;
+                        const dy = y - point.y;
+                        if (Math.sqrt(dx * dx + dy * dy) < 8) {
+                            setIsDrawingWire(true);
+                            setWireStart({ x: point.x, y: point.y, compId: comp.id });
+                            setCurrentWireEnd({ x, y });
+                            return;
+                        }
+                    }
+                }
+
+                setIsDrawingWire(true);
+                setWireStart({ x: snapToGrid(x), y: snapToGrid(y), compId: null });
+                setCurrentWireEnd({ x, y });
+            };
+
+            const handleCanvasMouseMove = (e) => {
+                const rect = canvasRef.current.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                if (isDragging && selectedComponent) {
+                    setComponents(components.map(comp =>
+                        comp.id === selectedComponent
+                            ? { ...comp, x: snapToGrid(x), y: snapToGrid(y) }
+                            : comp
+                    ));
+                }
+
+                if (isDrawingWire) {
+                    setCurrentWireEnd({ x, y });
+                }
+            };
+
+            const handleCanvasMouseUp = (e) => {
+                const rect = canvasRef.current.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                if (isDrawingWire && wireStart) {
+                    let endPoint = { x: snapToGrid(x), y: snapToGrid(y), compId: null };
+
+                    for (const comp of components) {
+                        const points = getConnectionPoints(comp);
+                        for (const point of points) {
+                            const dx = x - point.x;
+                            const dy = y - point.y;
+                            if (Math.sqrt(dx * dx + dy * dy) < 8) {
+                                endPoint = { x: point.x, y: point.y, compId: comp.id };
+                                break;
+                            }
+                        }
+                    }
+
+                    setWires([...wires, { start: wireStart, end: endPoint }]);
+                    setIsDrawingWire(false);
+                    setWireStart(null);
+                    setCurrentWireEnd(null);
+                }
+
+                if (isDragging) {
+                    setIsDragging(false);
+                    setSelectedComponent(null);
+                }
+            };
+
+            const rotateComponent = () => {
+                if (selectedComponent) {
+                    setComponents(components.map(comp =>
+                        comp.id === selectedComponent
+                            ? { ...comp, rotation: (comp.rotation + 90) % 360 }
+                            : comp
+                    ));
+                }
+            };
+
+            const deleteSelected = () => {
+                if (selectedComponent) {
+                    setComponents(components.filter(comp => comp.id !== selectedComponent));
+                    setWires(wires.filter(wire => 
+                        wire.start.compId !== selectedComponent && wire.end.compId !== selectedComponent
+                    ));
+                    setSelectedComponent(null);
+                }
+            };
+
+            const undoLastAction = () => {
+                if (wires.length > 0) {
+                    setWires(wires.slice(0, -1));
+                } else if (components.length > 0) {
+                    const lastComp = components[components.length - 1];
+                    setComponents(components.slice(0, -1));
+                    
+                    setComponentCounts(prev => ({
+                        ...prev,
+                        [lastComp.type]: Math.max(0, prev[lastComp.type] - 1)
+                    }));
+                    
+                    const newValues = { ...componentValues };
+                    delete newValues[lastComp.id];
+                    setComponentValues(newValues);
+                }
+            };
+
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                
+                const ctx = canvas.getContext('2d');
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.strokeStyle = '#f0f0f0';
+                ctx.lineWidth = 1;
+                for (let i = 0; i < canvas.width; i += gridSize) {
+                    ctx.beginPath();
+                    ctx.moveTo(i, 0);
+                    ctx.lineTo(i, canvas.height);
+                    ctx.stroke();
+                }
+                for (let i = 0; i < canvas.height; i += gridSize) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, i);
+                    ctx.lineTo(canvas.width, i);
+                    ctx.stroke();
+                }
+
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
+                wires.forEach(wire => {
+                    ctx.beginPath();
+                    ctx.moveTo(wire.start.x, wire.start.y);
+                    ctx.lineTo(wire.end.x, wire.end.y);
+                    ctx.stroke();
+                    
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath();
+                    ctx.arc(wire.start.x, wire.start.y, 3, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(wire.end.x, wire.end.y, 3, 0, 2 * Math.PI);
+                    ctx.fill();
+                });
+
+                if (isDrawingWire && wireStart && currentWireEnd) {
+                    ctx.strokeStyle = '#666';
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(wireStart.x, wireStart.y);
+                    ctx.lineTo(currentWireEnd.x, currentWireEnd.y);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+
+                components.forEach(comp => {
+                    if (comp.id === selectedComponent) {
+                        ctx.save();
+                        ctx.strokeStyle = '#0066cc';
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([5, 5]);
+                        ctx.strokeRect(comp.x - 35, comp.y - 35, 70, 70);
+                        ctx.setLineDash([]);
+                        ctx.restore();
+                    }
+                    drawComponent(ctx, comp, componentValues);
+                    
+                    if (comp.type === 'T' && componentValues[comp.id]) {
+                        const vals = componentValues[comp.id];
+                        if (vals.primary && vals.secondary) {
+                            ctx.fillStyle = '#cc0000';
+                            ctx.font = 'bold 13px Arial';
+                            ctx.textAlign = 'center';
+                            ctx.fillText(`${vals.primary}:${vals.secondary}`, comp.x, comp.y + 50);
+                        }
+                    }
+                });
+            }, [components, wires, selectedComponent, isDrawingWire, wireStart, currentWireEnd, componentValues, canvasSize]);
+
+            return (
+                <div style={{ width: '100%', height: '100vh', backgroundColor: '#f9fafb', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <div style={{ backgroundColor: 'white', borderBottom: '1px solid #e5e7eb', padding: '8px', overflowX: 'auto' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 'max-content', paddingBottom: '4px' }}>
+                            <div style={{ fontWeight: '600', color: '#374151', fontSize: '12px', marginRight: '8px', whiteSpace: 'nowrap' }}>Components:</div>
+                            {componentTypes.map((comp, idx) => (
+                                <button
+                                    key={idx}
+                                    onClick={() => addComponent(comp.type, comp.subtype)}
+                                    style={{ padding: '6px 8px', backgroundColor: '#3b82f6', color: 'white', fontSize: '12px', borderRadius: '4px', border: 'none', whiteSpace: 'nowrap', flexShrink: 0, cursor: 'pointer' }}
+                                >
+                                    {comp.name}
+                                </button>
+                            ))}
+                            
+                            <div style={{ marginLeft: '8px', display: 'flex', gap: '6px', borderLeft: '1px solid #d1d5db', paddingLeft: '8px' }}>
+                                <button
+                                    onClick={undoLastAction}
+                                    style={{ padding: '6px 8px', backgroundColor: '#f97316', color: 'white', fontSize: '12px', borderRadius: '4px', border: 'none', whiteSpace: 'nowrap', cursor: 'pointer' }}
+                                >
+                                    Undo
+                                </button>
+                                <button
+                                    onClick={rotateComponent}
+                                    disabled={!selectedComponent}
+                                    style={{ padding: '6px', backgroundColor: '#e5e7eb', borderRadius: '4px', border: 'none', opacity: selectedComponent ? 1 : 0.5, cursor: selectedComponent ? 'pointer' : 'not-allowed' }}
+                                >
+                                    <RotateCw size={16} />
+                                </button>
+                                <button
+                                    onClick={deleteSelected}
+                                    disabled={!selectedComponent}
+                                    style={{ padding: '6px', backgroundColor: '#ef4444', color: 'white', borderRadius: '4px', border: 'none', opacity: selectedComponent ? 1 : 0.5, cursor: selectedComponent ? 'pointer' : 'not-allowed' }}
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                  </div>
-                );
-              }
-              
-              // Components that need value and unit prefix
-              const needsUnitPrefix = ['R', 'C', 'L', 'I'].includes(comp.type) || 
-                                     (comp.type === 'V' && (comp.subtype === 'dc' || comp.subtype === 'ac'));
-              
-              if (!needsUnitPrefix) {
-                return (
-                  <div key={comp.id} className="mb-2 pb-2 border-b border-yellow-300 last:border-0">
-                    <div className="font-semibold text-xs">{comp.label}</div>
-                  </div>
-                );
-              }
-              
-              // Get the unit symbol for this component
-              let unitSymbol = '';
-              if (comp.type === 'R') unitSymbol = 'Ω';
-              else if (comp.type === 'C') unitSymbol = 'F';
-              else if (comp.type === 'L') unitSymbol = 'H';
-              else if (comp.type === 'I') unitSymbol = 'A';
-              else if (comp.type === 'V') unitSymbol = 'V';
-              
-              return (
-                <div key={comp.id} className="mb-2 pb-2 border-b border-yellow-300 last:border-0">
-                  <div className="font-semibold text-xs mb-1">{comp.label}</div>
-                  <div className="flex gap-1 items-center">
-                    <input
-                      type="text"
-                      placeholder="Value"
-                      value={componentValues[comp.id]?.value || ''}
-                      onChange={(e) => setComponentValues(prev => ({
-                        ...prev,
-                        [comp.id]: { ...prev[comp.id], value: e.target.value }
-                      }))}
-                      className="flex-1 px-1 py-1 text-xs border border-gray-300 rounded"
-                    />
-                    <select
-                      value={componentValues[comp.id]?.prefix || 1}
-                      onChange={(e) => setComponentValues(prev => ({
-                        ...prev,
-                        [comp.id]: { ...prev[comp.id], prefix: parseFloat(e.target.value) }
-                      }))}
-                      className="px-1 py-1 text-xs border border-gray-300 rounded w-12"
-                    >
-                      {unitPrefixes.map(prefix => (
-                        <option key={prefix.value} value={prefix.value}>
-                          {prefix.label}{unitSymbol}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
 
-export default CircuitDiagramBuilder;
+                    <div ref={containerRef} style={{ flex: 1, position: 'relative', overflow: 'auto' }}>
+                        <canvas
+                            ref={canvasRef}
+                            width={canvasSize.width}
+                            height={canvasSize.height}
+                            onMouseDown={handleCanvasMouseDown}
+                            onMouseMove={handleCanvasMouseMove}
+                            onMouseUp={handleCanvasMouseUp}
+                            onTouchStart={(e) => {
+                                e.preventDefault();
+                                const touch = e.touches[0];
+                                const rect = canvasRef.current.getBoundingClientRect();
+                                const mouseEvent = new MouseEvent('mousedown', {
+                                    clientX: touch.clientX,
+                                    clientY: touch.clientY
+                                });
+                                handleCanvasMouseDown(mouseEvent);
+                            }}
+                            onTouchMove={(e) => {
+                                e.preventDefault();
+                                const touch = e.touches[0];
+                                const mouseEvent = new MouseEvent('mousemove', {
+                                    clientX: touch.clientX,
+                                    clientY: touch.clientY
+                                });
+                                handleCanvasMouseMove(mouseEvent);
+                            }}
+                            onTouchEnd={(e) => {
+                                e.preventDefault();
+                                const mouseEvent = new MouseEvent('mouseup', {
+                                    clientX: e.changedTouches[0].clientX,
+                                    clientY: e.changedTouches[0].clientY
+                                });
+                                handleCanvasMouseUp(mouseEvent);
+                            }}
+                            style={{ cursor: 'crosshair', touchAction: 'none', backgroundColor: 'white' }}
+                        />
+                    </div>
+
+                    <div style={{ position: 'fixed', bottom: '8px', right: '8px', backgroundColor: '#fef3c7', border: '2px solid #fcd34d', borderRadius: '8px', boxShadow: '0 10px 15px rgba(0,0,0,0.1)', transition: 'all 0.3s', width: showNotes ? 'calc(91.666667% - 16px)' : '40px', maxWidth: showNotes ? '24rem' : '40px', zIndex: 50 }}>
+                        <div 
+                            onClick={() => setShowNotes(!showNotes)}
+                            style={{ backgroundColor: '#fde68a', padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '6px 6px 0 0' }}
+                        >
+                            <StickyNote size={16} />
+                            {showNotes && <span style={{ fontWeight: '600', fontSize: '14px' }}>Values</span>}
+                        </div>
+                        
+                        {showNotes && (
+                            <div style={{ padding: '8px', maxHeight: '256px', overflowY: 'auto' }}>
+                                {components.map(comp => {
+                                    if (comp.type === 'Q') {
+                                        return (
+                                            <div key={comp.id} style={{ marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #fcd34d' }}>
+                                                <div style={{ fontWeight: '600', fontSize: '12px' }}>{comp.label} - {comp.subtype === 'pnp' ? 'PNP' : 'NPN'}</div>
+                                            </div>
+                                        );
+                                    }
+                                    
+                                    if (comp.type === 'GND' || comp.type === 'SW') {
+                                        return (
+                                            <div key={comp.id} style={{ marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #fcd34d' }}>
+                                                <div style={{ fontWeight: '600', fontSize: '12px' }}>{comp.label}</div>
+                                            </div>
+                                        );
+                                    }
+                                    
+                                    if (comp.type === 'T') {
+                                        return (
+                                            <div key={comp.id} style={{ marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #fcd34d' }}>
+                                                <div style={{ fontWeight: '600', fontSize: '12px', marginBottom: '4px' }}>{comp.label}</div>
+                                                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Pri"
+                                                        value={componentValues[comp.id]?.primary || ''}
+                                                        onChange={(e) => setComponentValues(prev => ({
+                                                            ...prev,
+                                                            [comp.id]: { ...prev[comp.id], primary: e.target.value }
+                                                        }))}
+                                                        style={{ width: '56px', padding: '4px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                                                    />
+                                                    <span style={{ fontSize: '12px', fontWeight: '600' }}>:</span>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Sec"
+                                                        value={componentValues[comp.id]?.secondary || ''}
+                                                        onChange={(e) => setComponentValues(prev => ({
+                                                            ...prev,
+                                                            [comp.id]: { ...prev[comp.id], secondary: e.target.value }
+                                                        }))}
+                                                        style={{ width: '56px', padding: '4px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                    
+                                    const needsUnitPrefix = ['R', 'C', 'L', 'I'].includes(comp.type) || 
+                                                           (comp.type === 'V' && (comp.subtype === 'dc' || comp.subtype === 'ac'));
+                                    
+                                    if (!needsUnitPrefix) {
+                                        return (
+                                            <div key={comp.id} style={{ marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #fcd34d' }}>
+                                                <div style={{ fontWeight: '600', fontSize: '12px' }}>{comp.label}</div>
+                                            </div>
+                                        );
+                                    }
+                                    
+                                    let unitSymbol = '';
+                                    if (comp.type === 'R') unitSymbol = 'Ω';
+                                    else if (comp.type === 'C') unitSymbol = 'F';
+                                    else if (comp.type === 'L') unitSymbol = 'H';
+                                    else if (comp.type === 'I') unitSymbol = 'A';
+                                    else if (comp.type === 'V') unitSymbol = 'V';
+                                    
+                                    return (
+                                        <div key={comp.id} style={{ marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #fcd34d' }}>
+                                            <div style={{ fontWeight: '600', fontSize: '12px', marginBottom: '4px' }}>{comp.label}</div>
+                                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Value"
+                                                    value={componentValues[comp.id]?.value || ''}
+                                                    onChange={(e) => setComponentValues(prev => ({
+                                                        ...prev,
+                                                        [comp.id]: { ...prev[comp.id], value: e.target.value }
+                                                    }))}
+                                                    style={{ flex: 1, padding: '4px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                                                />
+                                                <select
+                                                    value={componentValues[comp.id]?.prefix || 1}
+                                                    onChange={(e) => setComponentValues(prev => ({
+                                                        ...prev,
+                                                        [comp.id]: { ...prev[comp.id], prefix: parseFloat(e.target.value) }
+                                                    }))}
+                                                    style={{ padding: '4px', fontSize: '12px', border: '1px solid #d1d5db', borderRadius: '4px', width: '48px' }}
+                                                >
+                                                    {unitPrefixes.map(prefix => (
+                                                        <option key={prefix.value} value={prefix.value}>
+                                                            {prefix.label}{unitSymbol}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<CircuitDiagramBuilder />);
+    </script>
+</body>
+</html>
