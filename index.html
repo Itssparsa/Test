@@ -480,32 +480,37 @@
 
                 ctx.restore();
 
+                // Draw label and values - these rotate with the component
+                ctx.save();
+                ctx.translate(comp.x, comp.y);
+                ctx.rotate((comp.rotation * Math.PI) / 180);
+                
                 ctx.fillStyle = '#0066cc';
                 ctx.font = 'bold 14px Arial';
                 ctx.textAlign = 'center';
                 
                 if (comp.type === 'Q') {
-                    ctx.fillText(comp.label, comp.x - 25, comp.y - 25);
+                    ctx.fillText(comp.label, -25, -25);
                 } else if (comp.type === 'GND') {
-                    ctx.fillText(comp.label, comp.x, comp.y + 25);
+                    ctx.fillText(comp.label, 0, 25);
                 } else if (comp.type === 'OPP') {
-                    ctx.fillText(comp.label, comp.x - 35, comp.y - 25);
+                    ctx.fillText(comp.label, -35, -25);
                 } else {
-                    ctx.fillText(comp.label, comp.x, comp.y - 35);
+                    ctx.fillText(comp.label, 0, -35);
                 }
                 
                 if (comp.type === 'Q') {
                     const transistorType = comp.subtype === 'pnp' ? 'PNP' : 'NPN';
                     ctx.fillStyle = '#cc0000';
                     ctx.font = 'bold 13px Arial';
-                    ctx.fillText(transistorType, comp.x - 25, comp.y + 35);
+                    ctx.fillText(transistorType, -25, 35);
                 } else if (comp.type === 'T') {
                     const vals = values[comp.id];
                     if (vals && vals.primary && vals.secondary) {
                         const ratioText = `${vals.primary}:${vals.secondary}`;
                         ctx.fillStyle = '#cc0000';
                         ctx.font = 'bold 13px Arial';
-                        ctx.fillText(ratioText, comp.x, comp.y + 38);
+                        ctx.fillText(ratioText, 0, 50);
                     }
                 } else if (values[comp.id]) {
                     const value = values[comp.id].value;
@@ -524,9 +529,11 @@
                         
                         ctx.fillStyle = '#cc0000';
                         ctx.font = 'bold 13px Arial';
-                        ctx.fillText(valueText, comp.x, comp.y + 38);
+                        ctx.fillText(valueText, 0, 38);
                     }
                 }
+                
+                ctx.restore();
             };
 
             const getConnectionPoints = (comp) => {
@@ -769,16 +776,6 @@
                         ctx.restore();
                     }
                     drawComponent(ctx, comp, componentValues);
-                    
-                    if (comp.type === 'T' && componentValues[comp.id]) {
-                        const vals = componentValues[comp.id];
-                        if (vals.primary && vals.secondary) {
-                            ctx.fillStyle = '#cc0000';
-                            ctx.font = 'bold 13px Arial';
-                            ctx.textAlign = 'center';
-                            ctx.fillText(`${vals.primary}:${vals.secondary}`, comp.x, comp.y + 50);
-                        }
-                    }
                 });
             }, [components, wires, selectedComponent, isDrawingWire, wireStart, currentWireEnd, componentValues, canvasSize]);
 
