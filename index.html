@@ -16,7 +16,30 @@ const CircuitDiagramBuilder = () => {
   });
   
   const canvasRef = useRef(null);
+  const containerRef = useRef(null);
   const gridSize = 20;
+  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 1200 });
+
+  useEffect(() => {
+    const updateCanvasSize = () => {
+      if (containerRef.current) {
+        const width = window.innerWidth;
+        const height = window.innerHeight - 100; // Account for toolbar
+        
+        // For mobile devices
+        if (width < 768) {
+          setCanvasSize({ width: width - 20, height: Math.max(height, 1000) });
+        } else {
+          // For desktop
+          setCanvasSize({ width: Math.max(1200, width - 40), height: Math.max(800, height) });
+        }
+      }
+    };
+
+    updateCanvasSize();
+    window.addEventListener('resize', updateCanvasSize);
+    return () => window.removeEventListener('resize', updateCanvasSize);
+  }, []);
 
   const componentTypes = [
     { type: 'R', name: 'Resistor', unit: 'Ω' },
@@ -747,6 +770,8 @@ const CircuitDiagramBuilder = () => {
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
+    
     const ctx = canvas.getContext('2d');
     
     // Clear canvas
@@ -823,7 +848,7 @@ const CircuitDiagramBuilder = () => {
         }
       }
     });
-  }, [components, wires, selectedComponent, isDrawingWire, wireStart, currentWireEnd, componentValues]);
+  }, [components, wires, selectedComponent, isDrawingWire, wireStart, currentWireEnd, componentValues, canvasSize]);
 
   return (
     <div className="w-full h-screen bg-gray-50 flex flex-col overflow-hidden">
@@ -870,11 +895,11 @@ const CircuitDiagramBuilder = () => {
       </div>
 
       {/* Canvas - Touch enabled for mobile */}
-      <div className="flex-1 relative overflow-auto">
+      <div ref={containerRef} className="flex-1 relative overflow-auto">
         <canvas
           ref={canvasRef}
-          width={800}
-          height={1200}
+          width={canvasSize.width}
+          height={canvasSize.height}
           onMouseDown={handleCanvasMouseDown}
           onMouseMove={handleCanvasMouseMove}
           onMouseUp={handleCanvasMouseUp}
@@ -905,7 +930,7 @@ const CircuitDiagramBuilder = () => {
             });
             handleCanvasMouseUp(mouseEvent);
           }}
-          className="cursor-crosshair touch-none"
+          className="cursor-crosshair touch-none bg-white"
           style={{ touchAction: 'none' }}
         />
       </div>
