@@ -596,12 +596,8 @@
                 });
 
                 if (clickedComp) {
-                    if (selectedComponent === clickedComp.id) {
-                        setIsDragging(true);
-                    } else {
-                        setSelectedComponent(clickedComp.id);
-                        setIsDragging(true);
-                    }
+                    setSelectedComponent(clickedComp.id);
+                    setIsDragging(true);
                     return;
                 }
 
@@ -670,10 +666,7 @@
                     setCurrentWireEnd(null);
                 }
 
-                if (isDragging) {
-                    setIsDragging(false);
-                    setSelectedComponent(null);
-                }
+                setIsDragging(false);
             };
 
             const rotateComponent = () => {
