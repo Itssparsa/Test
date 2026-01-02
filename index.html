@@ -1,432 +1,1037 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Ultimate Chaos Toaster</title>
-    <style>
-        /* --- Main Layout --- */
-        body {
-            background-color: #e6f7ff;
-            font-family: 'Courier New', Courier, monospace;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center; /* Centers vertically */
-            min-height: 100vh;
-            margin: 0;
-            /* FIX: Allow vertical scrolling if screen is too short, hide horizontal */
-            overflow-x: hidden;
-            overflow-y: auto; 
-            user-select: none;
-            padding: 20px;
-            box-sizing: border-box;
-        }
+import React, { useState, useRef, useEffect } from 'react';
+import { Trash2, RotateCw, StickyNote } from 'lucide-react';
 
-        h1 {
-            color: #333;
-            margin-top: 40px;
-            /* FIX: Increased gap so the toast doesn't hit the text when it pops */
-            margin-bottom: 120px; 
-            z-index: 10;
-            text-align: center;
-            font-size: 2rem;
-            position: relative;
-        }
+const CircuitDiagramBuilder = () => {
+  const [components, setComponents] = useState([]);
+  const [wires, setWires] = useState([]);
+  const [selectedComponent, setSelectedComponent] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isDrawingWire, setIsDrawingWire] = useState(false);
+  const [wireStart, setWireStart] = useState(null);
+  const [currentWireEnd, setCurrentWireEnd] = useState(null);
+  const [showNotes, setShowNotes] = useState(false);
+  const [componentValues, setComponentValues] = useState({});
+  const [componentCounts, setComponentCounts] = useState({
+    R: 0, D: 0, LED: 0, C: 0, Q: 0, V: 0, T: 0, L: 0, SW: 0, GND: 0, OP: 0, OPP: 0
+  });
+  
+  const canvasRef = useRef(null);
+  const gridSize = 20;
 
-        /* --- Sticky Notes (Responsive Positions) --- */
-        .sticky-note {
-            position: absolute;
-            background-color: #fff740;
-            padding: 15px;
-            width: 100px;
-            box-shadow: 3px 3px 8px rgba(0,0,0,0.2);
-            font-family: 'Comic Sans MS', cursive, sans-serif;
-            font-size: 12px;
-            text-align: center;
-            z-index: 2;
-            pointer-events: none;
-        }
+  const componentTypes = [
+    { type: 'R', name: 'Resistor', unit: 'Ω' },
+    { type: 'D', name: 'Diode', unit: '' },
+    { type: 'LED', name: 'LED', unit: '' },
+    { type: 'C', name: 'Capacitor', unit: 'F' },
+    { type: 'Q', name: 'NPN', unit: '' },
+    { type: 'Q', name: 'PNP', unit: '', subtype: 'pnp' },
+    { type: 'V', name: 'DC Supply', unit: 'V', subtype: 'dc' },
+    { type: 'V', name: 'AC Supply', unit: 'V', subtype: 'ac' },
+    { type: 'I', name: 'Current Source', unit: 'A' },
+    { type: 'T', name: 'Transformer', unit: '' },
+    { type: 'L', name: 'Inductor', unit: 'H' },
+    { type: 'SW', name: 'Switch', unit: '' },
+    { type: 'GND', name: 'Ground', unit: '' },
+    { type: 'OP', name: 'Op-Amp', unit: '' },
+    { type: 'OPP', name: 'Op-Amp (Power)', unit: '' }
+  ];
 
-        /* Adjusted positions to fit the new spacing */
-        .note-1 { top: 15%; left: 5%; transform: rotate(-12deg); }
-        .note-2 { top: 18%; right: 5%; transform: rotate(10deg); background-color: #ff99cc; }
-        .note-3 { bottom: 10%; left: 10%; transform: rotate(5deg); background-color: #a8e6cf; z-index: 12;}
+  const unitPrefixes = [
+    { value: 1e-12, label: 'p' },
+    { value: 1e-9, label: 'n' },
+    { value: 1e-6, label: 'µ' },
+    { value: 1e-3, label: 'm' },
+    { value: 1, label: '' },
+    { value: 1e3, label: 'k' },
+    { value: 1e6, label: 'M' }
+  ];
+
+  const snapToGrid = (value) => Math.round(value / gridSize) * gridSize;
+
+  const addComponent = (type, subtype = null) => {
+    const count = componentCounts[type] + 1;
+    const id = `${type}${count}`;
+    
+    setComponentCounts(prev => ({ ...prev, [type]: count }));
+    
+    const newComponent = {
+      id,
+      type,
+      subtype,
+      x: 200,
+      y: 200,
+      rotation: 0,
+      label: id
+    };
+    
+    setComponents([...components, newComponent]);
+    
+    // Initialize component values differently for transformers
+    if (type === 'T') {
+      setComponentValues(prev => ({
+        ...prev,
+        [id]: { primary: '', secondary: '' }
+      }));
+    } else {
+      setComponentValues(prev => ({
+        ...prev,
+        [id]: { value: '', prefix: 1 }
+      }));
+    }
+  };
+
+  const drawComponent = (ctx, comp, values) => {
+    ctx.save();
+    ctx.translate(comp.x, comp.y);
+    ctx.rotate((comp.rotation * Math.PI) / 180);
+    ctx.strokeStyle = '#000';
+    ctx.fillStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const size = 40;
+
+    switch (comp.type) {
+      case 'R': // Resistor - zigzag
+        ctx.beginPath();
+        ctx.moveTo(-size, 0);
+        ctx.lineTo(-20, 0);
+        ctx.lineTo(-15, -8);
+        ctx.lineTo(-5, 8);
+        ctx.lineTo(5, -8);
+        ctx.lineTo(15, 8);
+        ctx.lineTo(20, 0);
+        ctx.lineTo(size, 0);
+        ctx.stroke();
+        break;
+
+      case 'D': // Diode - clean triangle
+        ctx.beginPath();
+        ctx.moveTo(-size, 0);
+        ctx.lineTo(-8, 0);
+        ctx.stroke();
         
-        /* --- The Toaster Rig --- */
-        .toaster-container {
-            position: relative;
-            width: 320px;
-            height: 240px;
-            z-index: 5;
+        ctx.beginPath();
+        ctx.moveTo(-8, -10);
+        ctx.lineTo(-8, 10);
+        ctx.lineTo(8, 0);
+        ctx.closePath();
+        ctx.fill();
+        
+        ctx.beginPath();
+        ctx.moveTo(8, -10);
+        ctx.lineTo(8, 10);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(8, 0);
+        ctx.lineTo(size, 0);
+        ctx.stroke();
+        break;
+
+      case 'LED': // LED with arrows
+        ctx.beginPath();
+        ctx.moveTo(-size, 0);
+        ctx.lineTo(-8, 0);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(-8, -10);
+        ctx.lineTo(-8, 10);
+        ctx.lineTo(8, 0);
+        ctx.closePath();
+        ctx.fill();
+        
+        ctx.beginPath();
+        ctx.moveTo(8, -10);
+        ctx.lineTo(8, 10);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(8, 0);
+        ctx.lineTo(size, 0);
+        ctx.stroke();
+        
+        // Two arrows
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(5, -15);
+        ctx.lineTo(12, -22);
+        ctx.moveTo(10, -20);
+        ctx.lineTo(12, -22);
+        ctx.lineTo(10, -24);
+        ctx.moveTo(10, -15);
+        ctx.lineTo(17, -22);
+        ctx.moveTo(15, -20);
+        ctx.lineTo(17, -22);
+        ctx.lineTo(15, -24);
+        ctx.stroke();
+        ctx.lineWidth = 2;
+        break;
+
+      case 'C': // Capacitor - two parallel lines
+        ctx.beginPath();
+        ctx.moveTo(-size, 0);
+        ctx.lineTo(-3, 0);
+        ctx.moveTo(-3, -16);
+        ctx.lineTo(-3, 16);
+        ctx.moveTo(3, -16);
+        ctx.lineTo(3, 16);
+        ctx.moveTo(3, 0);
+        ctx.lineTo(size, 0);
+        ctx.stroke();
+        break;
+
+      case 'Q': // Transistor NPN/PNP - clean recognizable design
+        // Circle
+        ctx.beginPath();
+        ctx.arc(0, 0, 20, 0, 2 * Math.PI);
+        ctx.stroke();
+        
+        // Base line (vertical on left)
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(-10, -14);
+        ctx.lineTo(-10, 14);
+        ctx.stroke();
+        ctx.lineWidth = 2;
+        
+        // Base connection
+        ctx.beginPath();
+        ctx.moveTo(-size, 0);
+        ctx.lineTo(-10, 0);
+        ctx.stroke();
+        
+        // Collector (top) and Emitter (bottom) lines
+        ctx.beginPath();
+        ctx.moveTo(-10, -8);
+        ctx.lineTo(8, -20);
+        ctx.lineTo(8, -size);
+        ctx.moveTo(-10, 8);
+        ctx.lineTo(8, 20);
+        ctx.lineTo(8, size);
+        ctx.stroke();
+        break;
+
+      case 'V': // Power supply
+        ctx.beginPath();
+        ctx.arc(0, 0, 18, 0, 2 * Math.PI);
+        ctx.stroke();
+        
+        if (comp.subtype === 'ac') {
+          ctx.beginPath();
+          ctx.moveTo(-10, 0);
+          for (let i = -10; i <= 10; i += 1) {
+            ctx.lineTo(i, Math.sin(i / 3) * 8);
+          }
+          ctx.stroke();
+        } else {
+          // DC - show polarity aligned with wire positions (left and right)
+          ctx.font = 'bold 14px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText('+', -8, 3);
+          ctx.fillText('−', 8, 3);
         }
         
-        /* The container shakes when stuck */
-        .container-shake { animation: rattle 0.1s infinite; }
-        @keyframes rattle {
-            0% { transform: translate(1px, 1px) rotate(0deg); }
-            25% { transform: translate(-1px, -2px) rotate(-1deg); }
-            50% { transform: translate(-2px, 0px) rotate(1deg); }
-            75% { transform: translate(2px, 1px) rotate(0deg); }
-            100% { transform: translate(1px, -1px) rotate(0deg); }
-        }
+        ctx.beginPath();
+        ctx.moveTo(-size, 0);
+        ctx.lineTo(-18, 0);
+        ctx.moveTo(18, 0);
+        ctx.lineTo(size, 0);
+        ctx.stroke();
+        break;
 
-        /* --- EFFECTS LAYER --- */
-        .lightning {
-            position: absolute;
-            font-size: 60px;
-            color: #FFD700;
-            opacity: 0;
-            z-index: 20;
-            text-shadow: 0 0 15px #FFA500;
-            pointer-events: none;
-        }
-        .bolt-1 { top: -80px; left: 20px; transform: rotate(-30deg); }
-        .bolt-2 { top: -100px; right: 20px; transform: rotate(30deg); }
-        .zap-active { animation: flash 0.1s linear infinite alternate; opacity: 1; }
-        @keyframes flash { from { opacity: 0; } to { opacity: 1; } }
-
-        .smoke-particle {
-            position: absolute;
-            background: #555;
-            border-radius: 50%;
-            opacity: 0;
-            z-index: 1;
-        }
-        .smoke-active { animation: rise 2s infinite ease-out; }
-        @keyframes rise {
-            0% { transform: translateY(0) scale(1); opacity: 0.7; }
-            100% { transform: translateY(-100px) scale(3); opacity: 0; }
-        }
-
-        .glow-bg {
-            position: absolute;
-            width: 300px;
-            height: 300px;
-            background: radial-gradient(circle, rgba(255,255,200,0.8) 0%, rgba(255,255,255,0) 70%);
-            top: -100px;
-            left: 10px;
-            opacity: 0;
-            z-index: 1;
-            transition: opacity 1s;
-        }
-
-        /* --- The Toast --- */
-        .toast {
-            position: absolute;
-            width: 160px;
-            height: 140px;
-            background-color: #f4a460;
-            border: 4px solid #8b4513;
-            border-radius: 15px 15px 5px 5px;
-            left: 80px;
-            top: 60px; /* Sit inside toaster */
-            transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.3s;
-            z-index: 4;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-        }
-
-        .toast-face {
-            font-size: 30px;
-            font-weight: bold;
-            color: #5a2d0c;
-        }
-
-        /* SCENARIO STYLES */
-        .toast.normal { background-color: #ffc87c; border-color: #c98a45; }
-        .toast.burnt { background-color: #333; border-color: #000; }
-        .toast.burnt .toast-face { color: #fff; }
-        .toast.raw { background-color: #fdf5e6; border-color: #e0d5c0; }
-        .toast.raw .toast-face { color: #a0a0a0; }
-        .toast.electro {
-            background-color: #555; border-color: #ffff00;
-            animation: shake 0.1s infinite;
-        }
-        .toast.electro .toast-face { color: #ffff00; text-shadow: 0 0 5px red; }
-        .toast.perfect {
-            background-color: #eebb55; border-color: #d4a017;
-            box-shadow: 0 0 20px #ffd700;
-        }
-
-        /* THE STUCK STATE */
-        .toast.stuck { animation: panicShake 0.2s infinite; }
-        .toast.stuck .toast-face { color: #8b0000; font-size: 36px;}
-
-        @keyframes shake { 0% { transform: translateX(-2px); } 100% { transform: translateX(2px); } }
-        @keyframes panicShake {
-             0% { transform: translate(0, 0) rotate(0deg); }
-            25% { transform: translate(-3px, 2px) rotate(-2deg); }
-            50% { transform: translate(0, -2px) rotate(0deg); }
-            75% { transform: translate(3px, 2px) rotate(2deg); }
-            100% { transform: translate(0, 0) rotate(0deg); }
-        }
-
-        /* --- The Toaster Body --- */
-        .toaster-body {
-            position: absolute;
-            width: 320px;
-            height: 200px;
-            background: linear-gradient(180deg, #dcdcdc 0%, #a9a9a9 100%);
-            border: 5px solid #555;
-            border-radius: 30px;
-            bottom: 0;
-            z-index: 10;
-            box-shadow: 10px 10px 0px rgba(0,0,0,0.1);
-        }
-
-        .slot {
-            position: absolute;
-            top: 25px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 220px;
-            height: 18px;
-            background-color: #222;
-            border-radius: 10px;
-            border-bottom: 2px solid #666;
-        }
-
-        /* --- The Handle --- */
-        .handle-track {
-            position: absolute; right: -25px; top: 50px; width: 15px; height: 90px;
-            background-color: #888; border-radius: 5px; z-index: 9;
-        }
-
-        .handle-knob {
-            position: absolute; right: -45px; top: 50px; width: 50px; height: 25px;
-            background-color: #333; border-radius: 5px; cursor: pointer;
-            transition: top 0.3s; z-index: 11;
-        }
-        .handle-knob:active { background-color: #000; }
-
-        .popped:not(.stuck) { top: -90px !important; } 
-        .knob-down { top: 115px !important; }
-
-        /* --- Text Area --- */
-        #wisdom-display {
-            margin-top: 50px;
-            background: white; border: 4px solid #333;
-            padding: 20px; border-radius: 15px;
-            width: 90%; max-width: 500px; min-height: 60px;
-            text-align: center; box-shadow: 6px 6px 0px #333;
-            opacity: 0; transform: scale(0.9);
-            transition: all 0.3s ease;
-            font-size: 18px; font-weight: bold; z-index: 100;
-            position: relative;
-        }
-
-        .visible { opacity: 1 !important; transform: scale(1) !important; }
-
-        button {
-            margin-top: 20px; padding: 15px 30px; font-size: 18px;
-            font-family: inherit; background: #ff6b6b; color: white;
-            border: none; border-radius: 8px; cursor: pointer;
-            display: none; box-shadow: 0 4px #d43f3f; z-index: 101;
-            margin-bottom: 50px;
-        }
-        button:active { transform: translateY(4px); box-shadow: 0 0 #d43f3f; }
-
-        /* --- MOBILE OPTIMIZATION --- */
-        @media (max-width: 600px) {
-            h1 {
-                font-size: 1.5rem;
-                margin-bottom: 110px; /* Keep gap large on mobile too */
-            }
-            .toaster-container {
-                transform: scale(0.85);
-                margin-bottom: -20px;
-            }
-            .note-1 { top: 10%; left: 0%; width: 80px; font-size: 11px;}
-            .note-2 { top: 12%; right: 0%; width: 80px; font-size: 11px;}
-            
-            #wisdom-display {
-                font-size: 16px;
-                padding: 15px;
-                margin-top: 30px;
-            }
-        }
-    </style>
-</head>
-<body>
-
-    <h1>The Chaos Toaster</h1>
-
-    <div class="sticky-note note-1">"Days since last kitchen fire: 0"</div>
-    <div class="sticky-note note-2">Do not feed the toaster after midnight.</div>
-    <div class="sticky-note note-3">If bread screams, unplug unit.</div>
-
-    <div class="toaster-container" id="toaster-rig">
-        <div class="glow-bg" id="halo"></div>
-        <div class="lightning bolt-1" id="bolt1">⚡</div>
-        <div class="lightning bolt-2" id="bolt2">⚡</div>
+      case 'I': // Current source - arrow in line
+        ctx.beginPath();
+        ctx.arc(0, 0, 18, 0, 2 * Math.PI);
+        ctx.stroke();
         
-        <div class="smoke-particle" style="left: 100px; width: 20px; height: 20px; top: 0px;" id="s1"></div>
-        <div class="smoke-particle" style="left: 150px; width: 30px; height: 30px; top: 20px;" id="s2"></div>
-        <div class="smoke-particle" style="left: 200px; width: 25px; height: 25px; top: 10px;" id="s3"></div>
-
-        <div class="toast" id="toast">
-            <div class="toast-face">o_o</div>
-        </div>
-
-        <div class="toaster-body">
-            <div class="slot"></div>
-        </div>
+        // Horizontal line through circle with arrow
+        ctx.beginPath();
+        ctx.moveTo(-size, 0);
+        ctx.lineTo(-18, 0);
+        ctx.moveTo(-10, 0);
+        ctx.lineTo(10, 0);
+        ctx.stroke();
         
-        <div class="handle-track"></div>
-        <div class="handle-knob" id="handle" onclick="toastBread()"></div>
-    </div>
+        // Arrow head pointing right
+        ctx.beginPath();
+        ctx.moveTo(10, 0);
+        ctx.lineTo(6, -4);
+        ctx.moveTo(10, 0);
+        ctx.lineTo(6, 4);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(18, 0);
+        ctx.lineTo(size, 0);
+        ctx.stroke();
+        break;
 
-    <div id="wisdom-display">Pull the lever to confront your destiny.</div>
-    <button id="reset-btn" onclick="resetToaster()">Insert New Bread</button>
+      case 'T': // Transformer - clean parallel coils
+        ctx.lineWidth = 2;
+        
+        // Left coil (vertical) - more compact
+        ctx.beginPath();
+        ctx.moveTo(-15, -size);
+        ctx.lineTo(-15, -20);
+        // 4 tight loops
+        for (let i = 0; i < 4; i++) {
+          ctx.arc(-15, -20 + i * 6 + 3, 3, 0, Math.PI, true);
+        }
+        ctx.lineTo(-15, -20 + 24);
+        ctx.lineTo(-15, size);
+        ctx.stroke();
+        
+        // Right coil (vertical) - more compact
+        ctx.beginPath();
+        ctx.moveTo(15, -size);
+        ctx.lineTo(15, -20);
+        // 4 tight loops
+        for (let i = 0; i < 4; i++) {
+          ctx.arc(15, -20 + i * 6 + 3, 3, 0, Math.PI, true);
+        }
+        ctx.lineTo(15, -20 + 24);
+        ctx.lineTo(15, size);
+        ctx.stroke();
+        
+        // Two parallel vertical lines in center (core)
+        ctx.beginPath();
+        ctx.moveTo(0, -28);
+        ctx.lineTo(0, 28);
+        ctx.moveTo(3, -28);
+        ctx.lineTo(3, 28);
+        ctx.stroke();
+        break;
 
-    <script>
-        const toasterRig = document.getElementById('toaster-rig');
-        const toast = document.getElementById('toast');
-        const handle = document.getElementById('handle');
-        const display = document.getElementById('wisdom-display');
-        const resetBtn = document.getElementById('reset-btn');
-        const face = document.querySelector('.toast-face');
-        const halo = document.getElementById('halo');
-        const bolts = [document.getElementById('bolt1'), document.getElementById('bolt2')];
-        const smokeParticles = [document.getElementById('s1'), document.getElementById('s2'), document.getElementById('s3')];
+      case 'L': // Inductor - cleaner coil
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-size, 0);
+        ctx.lineTo(-32, 0);
+        
+        // Draw 4 smooth semicircles
+        for (let i = 0; i < 4; i++) {
+          ctx.arc(-32 + i * 10 + 5, 0, 5, Math.PI, 0, false);
+        }
+        
+        ctx.lineTo(size, 0);
+        ctx.stroke();
+        break;
 
-        let isToasting = false;
+      case 'SW': // Switch
+        ctx.beginPath();
+        ctx.moveTo(-size, 0);
+        ctx.lineTo(-8, 0);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.arc(-8, 0, 2.5, 0, 2 * Math.PI);
+        ctx.fill();
+        
+        ctx.beginPath();
+        ctx.moveTo(-8, 0);
+        ctx.lineTo(8, 10);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.arc(8, 0, 2.5, 0, 2 * Math.PI);
+        ctx.fill();
+        
+        ctx.beginPath();
+        ctx.moveTo(8, 0);
+        ctx.lineTo(size, 0);
+        ctx.stroke();
+        break;
 
-        // --- THE 6 POSSIBLE DESTINIES ---
-        const scenarios = [
-            {
-                type: 'normal',
-                face: 'o_o',
-                quotes: [
-                    "I am bread. I am pain. I am breakfast.",
-                    "Is it hot in here, or is it just my impending doom?",
-                    "Please do not apply the avocado. I cannot afford the rent.",
-                    "I used to have dreams. Now I have crumbs.",
-                    "I'm mediocre! Just like you wanted!"
-                ]
-            },
-            {
-                type: 'stuck',
-                face: '>_<',
-                quotes: [
-                    "HELP! MY HIPS ARE TOO WIDE!",
-                    "Tell my family I love th—mmmphhh!!",
-                    "It's dark down here and I smell old cheese.",
-                    "A LITTLE HELP PLEASE?!",
-                    "Pivot! PIVOT!"
-                ]
-            },
-            {
-                type: 'perfect',
-                face: 'uwu',
-                quotes: [
-                    "I HAVE ASCENDED.",
-                    "Behold my golden crust and weep.",
-                    "No butter required. I am divine.",
-                    "I am the main character."
-                ]
-            },
-            {
-                type: 'burnt',
-                face: 'x_x',
-                quotes: [
-                    "Everything is ash.",
-                    "I'm not burnt, I'm 'Cajun Style'.",
-                    "*Cough* *Wheeze* Help.",
-                    "Some men just want to watch the toast burn."
-                ]
-            },
-            {
-                type: 'electro',
-                face: '⚡_⚡',
-                quotes: [
-                    "BZZZZT! 120 VOLTS OF FLAVOR!",
-                    "I CAN FEEL MY ATOMS VIBRATING!",
-                    "DON'T TOUCH ME I'M SPICY!",
-                    "UNLIMITED POWER!!!"
-                ]
-            },
-            {
-                type: 'raw',
-                face: 'T_T',
-                quotes: [
-                    "Why did you even bother?",
-                    "Put me back, I'm naked!",
-                    "I am disappointingly moist.",
-                    "This is the worst spa day ever."
-                ]
-            }
+      case 'GND': // Ground
+        ctx.beginPath();
+        ctx.moveTo(0, -size);
+        ctx.lineTo(0, 0);
+        ctx.stroke();
+        
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(-15, 0);
+        ctx.lineTo(15, 0);
+        ctx.moveTo(-10, 5);
+        ctx.lineTo(10, 5);
+        ctx.moveTo(-5, 10);
+        ctx.lineTo(5, 10);
+        ctx.stroke();
+        ctx.lineWidth = 2;
+        break;
+
+      case 'OPP': // Op-Amp with Power - same as OP but with power pins
+      case 'OP': // Op-Amp
+        ctx.beginPath();
+        ctx.moveTo(-25, -20);
+        ctx.lineTo(25, 0);
+        ctx.lineTo(-25, 20);
+        ctx.closePath();
+        ctx.stroke();
+        
+        // Plus symbol (non-inverting)
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-18, -12);
+        ctx.lineTo(-12, -12);
+        ctx.moveTo(-15, -15);
+        ctx.lineTo(-15, -9);
+        ctx.stroke();
+        
+        // Minus symbol (inverting)
+        ctx.beginPath();
+        ctx.moveTo(-18, 12);
+        ctx.lineTo(-12, 12);
+        ctx.stroke();
+        ctx.lineWidth = 2;
+        
+        // Connections
+        ctx.beginPath();
+        ctx.moveTo(-25, -12);
+        ctx.lineTo(-size, -12);
+        ctx.moveTo(-25, 12);
+        ctx.lineTo(-size, 12);
+        ctx.moveTo(25, 0);
+        ctx.lineTo(size, 0);
+        ctx.stroke();
+        
+        // If power supply variant, add V+ and V- pins
+        if (comp.type === 'OPP') {
+          ctx.beginPath();
+          ctx.moveTo(0, -20);
+          ctx.lineTo(0, -30);
+          ctx.moveTo(0, 20);
+          ctx.lineTo(0, 30);
+          ctx.stroke();
+          
+          // V+ label
+          ctx.font = '10px Arial';
+          ctx.fillStyle = '#000';
+          ctx.textAlign = 'center';
+          ctx.fillText('V+', 10, -18);
+          ctx.fillText('V-', 10, 28);
+        }
+        break;
+    }
+
+    // Draw connection points
+    ctx.fillStyle = '#ff0000';
+    const points = getConnectionPoints(comp);
+    points.forEach(point => {
+      ctx.beginPath();
+      ctx.arc(point.dx, point.dy, 3, 0, 2 * Math.PI);
+      ctx.fill();
+    });
+
+    ctx.restore();
+
+    // Draw label
+    ctx.fillStyle = '#0066cc';
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    
+    // For transistors, move label to the left to avoid interference
+    if (comp.type === 'Q') {
+      ctx.fillText(comp.label, comp.x - 25, comp.y - 25);
+    } else if (comp.type === 'GND') {
+      // For ground, put label at the bottom
+      ctx.fillText(comp.label, comp.x, comp.y + 25);
+    } else if (comp.type === 'OPP') {
+      // For op-amp with power, move label to the right
+      ctx.fillText(comp.label, comp.x - 35, comp.y - 25);
+    } else {
+      ctx.fillText(comp.label, comp.x, comp.y - 35);
+    }
+    
+    // Draw value/type if it exists
+    if (comp.type === 'Q') {
+      // For transistors, show NPN or PNP below and to the left
+      const transistorType = comp.subtype === 'pnp' ? 'PNP' : 'NPN';
+      ctx.fillStyle = '#cc0000';
+      ctx.font = 'bold 13px Arial';
+      ctx.fillText(transistorType, comp.x - 25, comp.y + 35);
+    } else if (componentValues[comp.id]) {
+      const value = componentValues[comp.id].value;
+      const prefix = componentValues[comp.id].prefix;
+      
+      if (value) {
+        let unitSymbol = '';
+        if (comp.type === 'R') unitSymbol = 'Ω';
+        else if (comp.type === 'C') unitSymbol = 'F';
+        else if (comp.type === 'L') unitSymbol = 'H';
+        else if (comp.type === 'I') unitSymbol = 'A';
+        else if (comp.type === 'V') unitSymbol = 'V';
+        
+        // Find prefix label
+        const prefixLabel = unitPrefixes.find(p => p.value === prefix)?.label || '';
+        const valueText = `${value} ${prefixLabel}${unitSymbol}`;
+        
+        ctx.fillStyle = '#cc0000';
+        ctx.font = 'bold 13px Arial';
+        ctx.fillText(valueText, comp.x, comp.y + 38);
+      }
+    }
+  };
+
+  const getConnectionPoints = (comp) => {
+    const size = 40;
+    let points = [];
+
+    switch (comp.type) {
+      case 'Q': // Transistor - Base, Collector, Emitter
+        const angle = comp.rotation * Math.PI / 180;
+        points = [
+          { 
+            dx: -size * Math.cos(angle), 
+            dy: -size * Math.sin(angle), 
+            label: 'B' 
+          },
+          { 
+            dx: 8 * Math.cos(angle) + (-size) * Math.sin(angle), 
+            dy: 8 * Math.sin(angle) - (-size) * Math.cos(angle), 
+            label: 'C' 
+          },
+          { 
+            dx: 8 * Math.cos(angle) + size * Math.sin(angle), 
+            dy: 8 * Math.sin(angle) - size * Math.cos(angle), 
+            label: 'E' 
+          }
         ];
-
-        function toastBread() {
-            if (isToasting) return;
-            isToasting = true;
-
-            // 1. Animate Handle
-            handle.classList.add('knob-down');
-            display.classList.remove('visible');
-            display.innerText = "Toasting toasting toasting...";
-            face.innerText = "-_-"; // Sleeping face while toasting
-
-            // 2. Wait...
-            setTimeout(() => {
-                // 3. Roll the Dice
-                const outcome = scenarios[Math.floor(Math.random() * scenarios.length)];
-                
-                // 4. Apply Base Classes
-                toast.classList.add(outcome.type);
-                face.innerText = outcome.face;
-
-                // 5. Handle "Stuck" vs "Popped" logic
-                if (outcome.type !== 'stuck') {
-                    toast.classList.add('popped');
-                } else {
-                    toasterRig.classList.add('container-shake');
-                }
-
-                // 6. Handle Specific Effects
-                if(outcome.type === 'electro') {
-                    bolts.forEach(b => b.classList.add('zap-active'));
-                } else if (outcome.type === 'burnt') {
-                    smokeParticles.forEach(s => s.classList.add('smoke-active'));
-                } else if (outcome.type === 'perfect') {
-                    halo.style.opacity = '1';
-                }
-
-                // 7. Text
-                const randomQuote = outcome.quotes[Math.floor(Math.random() * outcome.quotes.length)];
-                display.innerText = `"${randomQuote}"`;
-                display.classList.add('visible');
-
-                resetBtn.style.display = 'block';
-
-            }, 1200); 
+        break;
+      case 'T': // Transformer - top and bottom of each coil
+        const tAngle = comp.rotation * Math.PI / 180;
+        points = [
+          { 
+            dx: -15 * Math.cos(tAngle) + (-size) * Math.sin(tAngle), 
+            dy: -15 * Math.sin(tAngle) - (-size) * Math.cos(tAngle), 
+            label: 'L1-top' 
+          },
+          { 
+            dx: -15 * Math.cos(tAngle) + size * Math.sin(tAngle), 
+            dy: -15 * Math.sin(tAngle) - size * Math.cos(tAngle), 
+            label: 'L1-bot' 
+          },
+          { 
+            dx: 15 * Math.cos(tAngle) + (-size) * Math.sin(tAngle), 
+            dy: 15 * Math.sin(tAngle) - (-size) * Math.cos(tAngle), 
+            label: 'L2-top' 
+          },
+          { 
+            dx: 15 * Math.cos(tAngle) + size * Math.sin(tAngle), 
+            dy: 15 * Math.sin(tAngle) - size * Math.cos(tAngle), 
+            label: 'L2-bot' 
+          }
+        ];
+        break;
+      case 'OPP': // Op-Amp with power - inputs, output, and power pins
+      case 'OP': // Op-Amp - inputs and output
+        const opAngle = comp.rotation * Math.PI / 180;
+        if (comp.type === 'OPP') {
+          points = [
+            { 
+              dx: -size * Math.cos(opAngle) + (-12) * Math.sin(opAngle), 
+              dy: -size * Math.sin(opAngle) - (-12) * Math.cos(opAngle), 
+              label: '+' 
+            },
+            { 
+              dx: -size * Math.cos(opAngle) + 12 * Math.sin(opAngle), 
+              dy: -size * Math.sin(opAngle) - 12 * Math.cos(opAngle), 
+              label: '-' 
+            },
+            { 
+              dx: size * Math.cos(opAngle), 
+              dy: size * Math.sin(opAngle), 
+              label: 'out' 
+            },
+            { 
+              dx: 0 * Math.cos(opAngle) + (-30) * Math.sin(opAngle), 
+              dy: 0 * Math.sin(opAngle) - (-30) * Math.cos(opAngle), 
+              label: 'V+' 
+            },
+            { 
+              dx: 0 * Math.cos(opAngle) + 30 * Math.sin(opAngle), 
+              dy: 0 * Math.sin(opAngle) - 30 * Math.cos(opAngle), 
+              label: 'V-' 
+            }
+          ];
+        } else {
+          points = [
+            { 
+              dx: -size * Math.cos(opAngle) + (-12) * Math.sin(opAngle), 
+              dy: -size * Math.sin(opAngle) - (-12) * Math.cos(opAngle), 
+              label: '+' 
+            },
+            { 
+              dx: -size * Math.cos(opAngle) + 12 * Math.sin(opAngle), 
+              dy: -size * Math.sin(opAngle) - 12 * Math.cos(opAngle), 
+              label: '-' 
+            },
+            { 
+              dx: size * Math.cos(opAngle), 
+              dy: size * Math.sin(opAngle), 
+              label: 'out' 
+            }
+          ];
         }
+        break;
+      case 'GND': // Ground - only top connection
+        const gndAngle = comp.rotation * Math.PI / 180;
+        points = [
+          { 
+            dx: 0 * Math.cos(gndAngle) + (-size) * Math.sin(gndAngle), 
+            dy: 0 * Math.sin(gndAngle) - (-size) * Math.cos(gndAngle), 
+            label: 'top' 
+          }
+        ];
+        break;
+      default:
+        points = [
+          { dx: -size * Math.cos(comp.rotation * Math.PI / 180), 
+            dy: -size * Math.sin(comp.rotation * Math.PI / 180), label: 'left' },
+          { dx: size * Math.cos(comp.rotation * Math.PI / 180), 
+            dy: size * Math.sin(comp.rotation * Math.PI / 180), label: 'right' }
+        ];
+    }
 
-        function resetToaster() {
-            isToasting = false;
-            
-            // Reset Positions
-            toast.classList.remove('popped');
-            handle.classList.remove('knob-down');
-            toasterRig.classList.remove('container-shake');
-            
-            // Remove all specific classes
-            toast.classList.remove('normal', 'stuck', 'perfect', 'burnt', 'electro', 'raw');
-            
-            // Reset Effects
-            bolts.forEach(b => b.classList.remove('zap-active'));
-            smokeParticles.forEach(s => s.classList.remove('smoke-active'));
-            halo.style.opacity = '0';
-            
-            // Reset Text & Face
-            display.classList.remove('visible');
-            resetBtn.style.display = 'none';
-            face.innerText = "o_o";
+    return points.map(p => ({
+      x: comp.x + p.dx,
+      y: comp.y + p.dy,
+      label: p.label
+    }));
+  };
+
+  const handleCanvasMouseDown = (e) => {
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Check if clicking on a component
+    const clickedComp = components.find(comp => {
+      const dx = x - comp.x;
+      const dy = y - comp.y;
+      return Math.sqrt(dx * dx + dy * dy) < 30;
+    });
+
+    if (clickedComp) {
+      // If clicking on already selected component, start dragging
+      // If clicking on a different component, select it
+      if (selectedComponent === clickedComp.id) {
+        setIsDragging(true);
+      } else {
+        setSelectedComponent(clickedComp.id);
+        setIsDragging(true);
+      }
+      return;
+    }
+
+    // Clicking on empty space deselects
+    setSelectedComponent(null);
+
+    // Check if clicking on a connection point to start wire
+    for (const comp of components) {
+      const points = getConnectionPoints(comp);
+      for (const point of points) {
+        const dx = x - point.x;
+        const dy = y - point.y;
+        if (Math.sqrt(dx * dx + dy * dy) < 8) {
+          setIsDrawingWire(true);
+          setWireStart({ x: point.x, y: point.y, compId: comp.id });
+          setCurrentWireEnd({ x, y });
+          return;
         }
-    </script>
-</body>
-</html>
+      }
+    }
+
+    // Start drawing wire from empty space
+    setIsDrawingWire(true);
+    setWireStart({ x: snapToGrid(x), y: snapToGrid(y), compId: null });
+    setCurrentWireEnd({ x, y });
+  };
+
+  const handleCanvasMouseMove = (e) => {
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (isDragging && selectedComponent) {
+      setComponents(components.map(comp =>
+        comp.id === selectedComponent
+          ? { ...comp, x: snapToGrid(x), y: snapToGrid(y) }
+          : comp
+      ));
+    }
+
+    if (isDrawingWire) {
+      setCurrentWireEnd({ x, y });
+    }
+  };
+
+  const handleCanvasMouseUp = (e) => {
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (isDrawingWire && wireStart) {
+      let endPoint = { x: snapToGrid(x), y: snapToGrid(y), compId: null };
+
+      // Check if ending on a connection point
+      for (const comp of components) {
+        const points = getConnectionPoints(comp);
+        for (const point of points) {
+          const dx = x - point.x;
+          const dy = y - point.y;
+          if (Math.sqrt(dx * dx + dy * dy) < 8) {
+            endPoint = { x: point.x, y: point.y, compId: comp.id };
+            break;
+          }
+        }
+      }
+
+      setWires([...wires, { start: wireStart, end: endPoint }]);
+      setIsDrawingWire(false);
+      setWireStart(null);
+      setCurrentWireEnd(null);
+    }
+
+    if (isDragging) {
+      setIsDragging(false);
+      // Deselect after dragging is complete
+      setSelectedComponent(null);
+    }
+  };
+
+  const rotateComponent = () => {
+    if (selectedComponent) {
+      setComponents(components.map(comp =>
+        comp.id === selectedComponent
+          ? { ...comp, rotation: (comp.rotation + 90) % 360 }
+          : comp
+      ));
+    }
+  };
+
+  const deleteSelected = () => {
+    if (selectedComponent) {
+      setComponents(components.filter(comp => comp.id !== selectedComponent));
+      setWires(wires.filter(wire => 
+        wire.start.compId !== selectedComponent && wire.end.compId !== selectedComponent
+      ));
+      setSelectedComponent(null);
+    }
+  };
+
+  const undoLastAction = () => {
+    if (wires.length > 0) {
+      // Remove last wire
+      setWires(wires.slice(0, -1));
+    } else if (components.length > 0) {
+      // Remove last component
+      const lastComp = components[components.length - 1];
+      setComponents(components.slice(0, -1));
+      
+      // Decrease the counter for that component type
+      setComponentCounts(prev => ({
+        ...prev,
+        [lastComp.type]: Math.max(0, prev[lastComp.type] - 1)
+      }));
+      
+      // Remove from componentValues
+      const newValues = { ...componentValues };
+      delete newValues[lastComp.id];
+      setComponentValues(newValues);
+    }
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    
+    // Clear canvas
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw grid
+    ctx.strokeStyle = '#f0f0f0';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < canvas.width; i += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i, canvas.height);
+      ctx.stroke();
+    }
+    for (let i = 0; i < canvas.height; i += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, i);
+      ctx.lineTo(canvas.width, i);
+      ctx.stroke();
+    }
+
+    // Draw wires
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    wires.forEach(wire => {
+      ctx.beginPath();
+      ctx.moveTo(wire.start.x, wire.start.y);
+      ctx.lineTo(wire.end.x, wire.end.y);
+      ctx.stroke();
+      
+      // Draw dots at wire ends
+      ctx.fillStyle = '#000';
+      ctx.beginPath();
+      ctx.arc(wire.start.x, wire.start.y, 3, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(wire.end.x, wire.end.y, 3, 0, 2 * Math.PI);
+      ctx.fill();
+    });
+
+    // Draw temporary wire
+    if (isDrawingWire && wireStart && currentWireEnd) {
+      ctx.strokeStyle = '#666';
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(wireStart.x, wireStart.y);
+      ctx.lineTo(currentWireEnd.x, currentWireEnd.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Draw components
+    components.forEach(comp => {
+      if (comp.id === selectedComponent) {
+        ctx.save();
+        ctx.strokeStyle = '#0066cc';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(comp.x - 35, comp.y - 35, 70, 70);
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+      drawComponent(ctx, comp, componentValues);
+      
+      // Draw transformer ratio separately
+      if (comp.type === 'T' && componentValues[comp.id]) {
+        const vals = componentValues[comp.id];
+        if (vals.primary && vals.secondary) {
+          ctx.fillStyle = '#cc0000';
+          ctx.font = 'bold 13px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText(`${vals.primary}:${vals.secondary}`, comp.x, comp.y + 50);
+        }
+      }
+    });
+  }, [components, wires, selectedComponent, isDrawingWire, wireStart, currentWireEnd, componentValues]);
+
+  return (
+    <div className="w-full h-screen bg-gray-50 flex flex-col overflow-hidden">
+      {/* Toolbar - Scrollable horizontally on mobile */}
+      <div className="bg-white border-b border-gray-200 p-2 overflow-x-auto">
+        <div className="flex items-center gap-1.5 min-w-max pb-1">
+          <div className="font-semibold text-gray-700 text-xs mr-2 whitespace-nowrap">Components:</div>
+          {componentTypes.map((comp, idx) => (
+            <button
+              key={idx}
+              onClick={() => addComponent(comp.type, comp.subtype)}
+              className="px-2 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition whitespace-nowrap flex-shrink-0"
+            >
+              {comp.name}
+            </button>
+          ))}
+          
+          <div className="ml-2 flex gap-1.5 border-l pl-2 border-gray-300">
+            <button
+              onClick={undoLastAction}
+              className="px-2 py-1.5 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 transition whitespace-nowrap"
+              title="Undo last action"
+            >
+              Undo
+            </button>
+            <button
+              onClick={rotateComponent}
+              disabled={!selectedComponent}
+              className="p-1.5 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Rotate (90°)"
+            >
+              <RotateCw size={16} />
+            </button>
+            <button
+              onClick={deleteSelected}
+              disabled={!selectedComponent}
+              className="p-1.5 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Delete"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Canvas - Touch enabled for mobile */}
+      <div className="flex-1 relative overflow-auto">
+        <canvas
+          ref={canvasRef}
+          width={800}
+          height={1200}
+          onMouseDown={handleCanvasMouseDown}
+          onMouseMove={handleCanvasMouseMove}
+          onMouseUp={handleCanvasMouseUp}
+          onTouchStart={(e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = canvasRef.current.getBoundingClientRect();
+            const mouseEvent = new MouseEvent('mousedown', {
+              clientX: touch.clientX,
+              clientY: touch.clientY
+            });
+            handleCanvasMouseDown(mouseEvent);
+          }}
+          onTouchMove={(e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousemove', {
+              clientX: touch.clientX,
+              clientY: touch.clientY
+            });
+            handleCanvasMouseMove(mouseEvent);
+          }}
+          onTouchEnd={(e) => {
+            e.preventDefault();
+            const mouseEvent = new MouseEvent('mouseup', {
+              clientX: e.changedTouches[0].clientX,
+              clientY: e.changedTouches[0].clientY
+            });
+            handleCanvasMouseUp(mouseEvent);
+          }}
+          className="cursor-crosshair touch-none"
+          style={{ touchAction: 'none' }}
+        />
+      </div>
+
+      {/* Sticky Note - Optimized for mobile */}
+      <div className={`fixed bottom-2 right-2 bg-yellow-100 border-2 border-yellow-300 rounded shadow-lg transition-all ${showNotes ? 'w-11/12 max-w-sm' : 'w-10'} z-50`}>
+        <div 
+          className="bg-yellow-200 p-2 cursor-pointer flex items-center justify-between"
+          onClick={() => setShowNotes(!showNotes)}
+        >
+          <StickyNote size={16} />
+          {showNotes && <span className="font-semibold text-sm">Values</span>}
+        </div>
+        
+        {showNotes && (
+          <div className="p-2 max-h-64 overflow-y-auto">
+            {components.map(comp => {
+              const compType = componentTypes.find(ct => ct.type === comp.type && ct.subtype === comp.subtype);
+              
+              // Skip value input for transistors
+              if (comp.type === 'Q') {
+                return (
+                  <div key={comp.id} className="mb-2 pb-2 border-b border-yellow-300 last:border-0">
+                    <div className="font-semibold text-xs">{comp.label} - {comp.subtype === 'pnp' ? 'PNP' : 'NPN'}</div>
+                  </div>
+                );
+              }
+              
+              // Skip value input for ground and switch
+              if (comp.type === 'GND' || comp.type === 'SW') {
+                return (
+                  <div key={comp.id} className="mb-2 pb-2 border-b border-yellow-300 last:border-0">
+                    <div className="font-semibold text-xs">{comp.label}</div>
+                  </div>
+                );
+              }
+              
+              // Transformer - show turns ratio input
+              if (comp.type === 'T') {
+                return (
+                  <div key={comp.id} className="mb-2 pb-2 border-b border-yellow-300 last:border-0">
+                    <div className="font-semibold text-xs mb-1">{comp.label}</div>
+                    <div className="flex gap-1 items-center">
+                      <input
+                        type="text"
+                        placeholder="Pri"
+                        value={componentValues[comp.id]?.primary || ''}
+                        onChange={(e) => setComponentValues(prev => ({
+                          ...prev,
+                          [comp.id]: { ...prev[comp.id], primary: e.target.value }
+                        }))}
+                        className="w-14 px-1 py-1 text-xs border border-gray-300 rounded"
+                      />
+                      <span className="text-xs font-semibold">:</span>
+                      <input
+                        type="text"
+                        placeholder="Sec"
+                        value={componentValues[comp.id]?.secondary || ''}
+                        onChange={(e) => setComponentValues(prev => ({
+                          ...prev,
+                          [comp.id]: { ...prev[comp.id], secondary: e.target.value }
+                        }))}
+                        className="w-14 px-1 py-1 text-xs border border-gray-300 rounded"
+                      />
+                    </div>
+                  </div>
+                );
+              }
+              
+              // Components that need value and unit prefix
+              const needsUnitPrefix = ['R', 'C', 'L', 'I'].includes(comp.type) || 
+                                     (comp.type === 'V' && (comp.subtype === 'dc' || comp.subtype === 'ac'));
+              
+              if (!needsUnitPrefix) {
+                return (
+                  <div key={comp.id} className="mb-2 pb-2 border-b border-yellow-300 last:border-0">
+                    <div className="font-semibold text-xs">{comp.label}</div>
+                  </div>
+                );
+              }
+              
+              // Get the unit symbol for this component
+              let unitSymbol = '';
+              if (comp.type === 'R') unitSymbol = 'Ω';
+              else if (comp.type === 'C') unitSymbol = 'F';
+              else if (comp.type === 'L') unitSymbol = 'H';
+              else if (comp.type === 'I') unitSymbol = 'A';
+              else if (comp.type === 'V') unitSymbol = 'V';
+              
+              return (
+                <div key={comp.id} className="mb-2 pb-2 border-b border-yellow-300 last:border-0">
+                  <div className="font-semibold text-xs mb-1">{comp.label}</div>
+                  <div className="flex gap-1 items-center">
+                    <input
+                      type="text"
+                      placeholder="Value"
+                      value={componentValues[comp.id]?.value || ''}
+                      onChange={(e) => setComponentValues(prev => ({
+                        ...prev,
+                        [comp.id]: { ...prev[comp.id], value: e.target.value }
+                      }))}
+                      className="flex-1 px-1 py-1 text-xs border border-gray-300 rounded"
+                    />
+                    <select
+                      value={componentValues[comp.id]?.prefix || 1}
+                      onChange={(e) => setComponentValues(prev => ({
+                        ...prev,
+                        [comp.id]: { ...prev[comp.id], prefix: parseFloat(e.target.value) }
+                      }))}
+                      className="px-1 py-1 text-xs border border-gray-300 rounded w-12"
+                    >
+                      {unitPrefixes.map(prefix => (
+                        <option key={prefix.value} value={prefix.value}>
+                          {prefix.label}{unitSymbol}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default CircuitDiagramBuilder;
