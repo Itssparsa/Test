@@ -69,6 +69,7 @@
             });
             const [zoom, setZoom] = useState(1);
             const [nodeNames, setNodeNames] = useState({});
+            const [isNamingNode, setIsNamingNode] = useState(false);
             
             const canvasRef = useRef(null);
             const containerRef = useRef(null);
@@ -596,7 +597,8 @@
                 const x = (e.clientX - rect.left) / zoom;
                 const y = (e.clientY - rect.top) / zoom;
 
-                if (e.detail === 2) {
+                // If in naming mode, name the clicked node
+                if (isNamingNode) {
                     for (const comp of components) {
                         const points = getConnectionPoints(comp);
                         for (const point of points) {
@@ -616,10 +618,13 @@
                                         }));
                                     }
                                 }
+                                setIsNamingNode(false);
                                 return;
                             }
                         }
                     }
+                    setIsNamingNode(false);
+                    return;
                 }
 
                 const clickedComp = components.find(comp => {
@@ -669,7 +674,26 @@
                 }
 
                 if (isDrawingWire) {
-                    setCurrentWireEnd({ x, y });
+                    // Magnetic snapping - check if near any connection point
+                    let snappedEnd = { x, y };
+                    const snapDistance = 15; // Magnetic range in pixels
+                    
+                    for (const comp of components) {
+                        const points = getConnectionPoints(comp);
+                        for (const point of points) {
+                            const dx = x - point.x;
+                            const dy = y - point.y;
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+                            
+                            if (distance < snapDistance) {
+                                snappedEnd = { x: point.x, y: point.y };
+                                break;
+                            }
+                        }
+                        if (snappedEnd.x !== x || snappedEnd.y !== y) break;
+                    }
+                    
+                    setCurrentWireEnd(snappedEnd);
                 }
             };
 
@@ -680,17 +704,22 @@
 
                 if (isDrawingWire && wireStart) {
                     let endPoint = { x: snapToGrid(x), y: snapToGrid(y), compId: null };
+                    const snapDistance = 15;
 
+                    // Magnetic snapping for wire end
                     for (const comp of components) {
                         const points = getConnectionPoints(comp);
                         for (const point of points) {
                             const dx = x - point.x;
                             const dy = y - point.y;
-                            if (Math.sqrt(dx * dx + dy * dy) < 8) {
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+                            
+                            if (distance < snapDistance) {
                                 endPoint = { x: point.x, y: point.y, compId: comp.id };
                                 break;
                             }
                         }
+                        if (endPoint.compId) break;
                     }
 
                     setWires([...wires, { start: wireStart, end: endPoint }]);
@@ -852,6 +881,13 @@
                                     style={{ padding: '6px', backgroundColor: '#ef4444', color: 'white', borderRadius: '4px', border: 'none', opacity: selectedComponent ? 1 : 0.5, cursor: selectedComponent ? 'pointer' : 'not-allowed' }}
                                 >
                                     <Trash2 size={16} />
+                                </button>
+                                <button
+                                    onClick={() => setIsNamingNode(!isNamingNode)}
+                                    style={{ padding: '6px 8px', backgroundColor: isNamingNode ? '#10b981' : '#6b7280', color: 'white', fontSize: '12px', borderRadius: '4px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                    title="Name Node"
+                                >
+                                    {isNamingNode ? '✓ Name' : 'Name'}
                                 </button>
                             </div>
                             
