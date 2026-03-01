@@ -601,11 +601,11 @@
 
             const getConnectionPoints = (comp) => {
                 const size = 40;
+                const angle = comp.rotation * Math.PI / 180;
                 let points = [];
 
                 switch (comp.type) {
                     case 'Q':
-                        const angle = comp.rotation * Math.PI / 180;
                         points = [
                             { dx: -size * Math.cos(angle), dy: -size * Math.sin(angle), label: 'B' },
                             { dx: 8 * Math.cos(angle) + (-size) * Math.sin(angle), dy: 8 * Math.sin(angle) - (-size) * Math.cos(angle), label: 'C' },
@@ -613,41 +613,38 @@
                         ];
                         break;
                     case 'T':
-                        const tAngle = comp.rotation * Math.PI / 180;
                         points = [
-                            { dx: -15 * Math.cos(tAngle) + (-size) * Math.sin(tAngle), dy: -15 * Math.sin(tAngle) - (-size) * Math.cos(tAngle), label: 'L1-top' },
-                            { dx: -15 * Math.cos(tAngle) + size * Math.sin(tAngle), dy: -15 * Math.sin(tAngle) - size * Math.cos(tAngle), label: 'L1-bot' },
-                            { dx: 15 * Math.cos(tAngle) + (-size) * Math.sin(tAngle), dy: 15 * Math.sin(tAngle) - (-size) * Math.cos(tAngle), label: 'L2-top' },
-                            { dx: 15 * Math.cos(tAngle) + size * Math.sin(tAngle), dy: 15 * Math.sin(tAngle) - size * Math.cos(tAngle), label: 'L2-bot' }
+                            { dx: -15 * Math.cos(angle) + (-size) * Math.sin(angle), dy: -15 * Math.sin(angle) - (-size) * Math.cos(angle), label: 'L1-top' },
+                            { dx: -15 * Math.cos(angle) + size * Math.sin(angle), dy: -15 * Math.sin(angle) - size * Math.cos(angle), label: 'L1-bot' },
+                            { dx: 15 * Math.cos(angle) + (-size) * Math.sin(angle), dy: 15 * Math.sin(angle) - (-size) * Math.cos(angle), label: 'L2-top' },
+                            { dx: 15 * Math.cos(angle) + size * Math.sin(angle), dy: 15 * Math.sin(angle) - size * Math.cos(angle), label: 'L2-bot' }
                         ];
                         break;
                     case 'OPP':
                     case 'OP':
-                        const opAngle = comp.rotation * Math.PI / 180;
                         if (comp.type === 'OPP') {
                             points = [
-                                { dx: -size * Math.cos(opAngle) + (-12) * Math.sin(opAngle), dy: -size * Math.sin(opAngle) - (-12) * Math.cos(opAngle), label: '+' },
-                                { dx: -size * Math.cos(opAngle) + 12 * Math.sin(opAngle), dy: -size * Math.sin(opAngle) - 12 * Math.cos(opAngle), label: '-' },
-                                { dx: size * Math.cos(opAngle), dy: size * Math.sin(opAngle), label: 'out' },
-                                { dx: 0 * Math.cos(opAngle) + (-30) * Math.sin(opAngle), dy: 0 * Math.sin(opAngle) - (-30) * Math.cos(opAngle), label: 'V+' },
-                                { dx: 0 * Math.cos(opAngle) + 30 * Math.sin(opAngle), dy: 0 * Math.sin(opAngle) - 30 * Math.cos(opAngle), label: 'V-' }
+                                { dx: -size * Math.cos(angle) + (-12) * Math.sin(angle), dy: -size * Math.sin(angle) - (-12) * Math.cos(angle), label: '+' },
+                                { dx: -size * Math.cos(angle) + 12 * Math.sin(angle), dy: -size * Math.sin(angle) - 12 * Math.cos(angle), label: '-' },
+                                { dx: size * Math.cos(angle), dy: size * Math.sin(angle), label: 'out' },
+                                { dx: 0 * Math.cos(angle) + (-30) * Math.sin(angle), dy: 0 * Math.sin(angle) - (-30) * Math.cos(angle), label: 'V+' },
+                                { dx: 0 * Math.cos(angle) + 30 * Math.sin(angle), dy: 0 * Math.sin(angle) - 30 * Math.cos(angle), label: 'V-' }
                             ];
                         } else {
                             points = [
-                                { dx: -size * Math.cos(opAngle) + (-12) * Math.sin(opAngle), dy: -size * Math.sin(opAngle) - (-12) * Math.cos(opAngle), label: '+' },
-                                { dx: -size * Math.cos(opAngle) + 12 * Math.sin(opAngle), dy: -size * Math.sin(opAngle) - 12 * Math.cos(opAngle), label: '-' },
-                                { dx: size * Math.cos(opAngle), dy: size * Math.sin(opAngle), label: 'out' }
+                                { dx: -size * Math.cos(angle) + (-12) * Math.sin(angle), dy: -size * Math.sin(angle) - (-12) * Math.cos(angle), label: '+' },
+                                { dx: -size * Math.cos(angle) + 12 * Math.sin(angle), dy: -size * Math.sin(angle) - 12 * Math.cos(angle), label: '-' },
+                                { dx: size * Math.cos(angle), dy: size * Math.sin(angle), label: 'out' }
                             ];
                         }
                         break;
                     case 'GND':
-                        const gndAngle = comp.rotation * Math.PI / 180;
-                        points = [{ dx: 0 * Math.cos(gndAngle) + (-size) * Math.sin(gndAngle), dy: 0 * Math.sin(gndAngle) - (-size) * Math.cos(gndAngle), label: 'top' }];
+                        points = [{ dx: 0 * Math.cos(angle) + (-size) * Math.sin(angle), dy: 0 * Math.sin(angle) - (-size) * Math.cos(angle), label: 'top' }];
                         break;
                     default:
                         points = [
-                            { dx: -size * Math.cos(comp.rotation * Math.PI / 180), dy: -size * Math.sin(comp.rotation * Math.PI / 180), label: 'left' },
-                            { dx: size * Math.cos(comp.rotation * Math.PI / 180), dy: size * Math.sin(comp.rotation * Math.PI / 180), label: 'right' }
+                            { dx: -size * Math.cos(angle), dy: -size * Math.sin(angle), label: 'left' },
+                            { dx: size * Math.cos(angle), dy: size * Math.sin(angle), label: 'right' }
                         ];
                 }
 
