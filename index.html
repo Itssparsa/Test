@@ -599,62 +599,13 @@
                 ctx.restore();
             };
 
-            const getRelativeConnectionPoints = (type) => {
-                const size = 40;
-                let points = [];
-
-                switch (type) {
-                    case 'Q':
-                        points = [
-                            { dx: -size, dy: 0, label: 'B' },
-                            { dx: 8, dy: -size, label: 'C' },
-                            { dx: 8, dy: size, label: 'E' }
-                        ];
-                        break;
-                    case 'T':
-                        points = [
-                            { dx: -15, dy: -size, label: 'L1-top' },
-                            { dx: -15, dy: size, label: 'L1-bot' },
-                            { dx: 15, dy: -size, label: 'L2-top' },
-                            { dx: 15, dy: size, label: 'L2-bot' }
-                        ];
-                        break;
-                    case 'OPP':
-                        points = [
-                            { dx: -size, dy: -12, label: '+' },
-                            { dx: -size, dy: 12, label: '-' },
-                            { dx: size, dy: 0, label: 'out' },
-                            { dx: 0, dy: -30, label: 'V+' },
-                            { dx: 0, dy: 30, label: 'V-' }
-                        ];
-                        break;
-                    case 'OP':
-                        points = [
-                            { dx: -size, dy: -12, label: '+' },
-                            { dx: -size, dy: 12, label: '-' },
-                            { dx: size, dy: 0, label: 'out' }
-                        ];
-                        break;
-                    case 'GND':
-                        points = [{ dx: 0, dy: -size, label: 'top' }];
-                        break;
-                    default:
-                        points = [
-                            { dx: -size, dy: 0, label: 'left' },
-                            { dx: size, dy: 0, label: 'right' }
-                        ];
-                }
-
-                return points;
-            };
-
             const getConnectionPoints = (comp) => {
                 const size = 40;
-                const angle = comp.rotation * Math.PI / 180;
                 let points = [];
 
                 switch (comp.type) {
                     case 'Q':
+                        const angle = comp.rotation * Math.PI / 180;
                         points = [
                             { dx: -size * Math.cos(angle), dy: -size * Math.sin(angle), label: 'B' },
                             { dx: 8 * Math.cos(angle) + (-size) * Math.sin(angle), dy: 8 * Math.sin(angle) - (-size) * Math.cos(angle), label: 'C' },
@@ -662,38 +613,41 @@
                         ];
                         break;
                     case 'T':
+                        const tAngle = comp.rotation * Math.PI / 180;
                         points = [
-                            { dx: -15 * Math.cos(angle) + (-size) * Math.sin(angle), dy: -15 * Math.sin(angle) - (-size) * Math.cos(angle), label: 'L1-top' },
-                            { dx: -15 * Math.cos(angle) + size * Math.sin(angle), dy: -15 * Math.sin(angle) - size * Math.cos(angle), label: 'L1-bot' },
-                            { dx: 15 * Math.cos(angle) + (-size) * Math.sin(angle), dy: 15 * Math.sin(angle) - (-size) * Math.cos(angle), label: 'L2-top' },
-                            { dx: 15 * Math.cos(angle) + size * Math.sin(angle), dy: 15 * Math.sin(angle) - size * Math.cos(angle), label: 'L2-bot' }
+                            { dx: -15 * Math.cos(tAngle) + (-size) * Math.sin(tAngle), dy: -15 * Math.sin(tAngle) - (-size) * Math.cos(tAngle), label: 'L1-top' },
+                            { dx: -15 * Math.cos(tAngle) + size * Math.sin(tAngle), dy: -15 * Math.sin(tAngle) - size * Math.cos(tAngle), label: 'L1-bot' },
+                            { dx: 15 * Math.cos(tAngle) + (-size) * Math.sin(tAngle), dy: 15 * Math.sin(tAngle) - (-size) * Math.cos(tAngle), label: 'L2-top' },
+                            { dx: 15 * Math.cos(tAngle) + size * Math.sin(tAngle), dy: 15 * Math.sin(tAngle) - size * Math.cos(tAngle), label: 'L2-bot' }
                         ];
                         break;
                     case 'OPP':
                     case 'OP':
+                        const opAngle = comp.rotation * Math.PI / 180;
                         if (comp.type === 'OPP') {
                             points = [
-                                { dx: -size * Math.cos(angle) + (-12) * Math.sin(angle), dy: -size * Math.sin(angle) - (-12) * Math.cos(angle), label: '+' },
-                                { dx: -size * Math.cos(angle) + 12 * Math.sin(angle), dy: -size * Math.sin(angle) - 12 * Math.cos(angle), label: '-' },
-                                { dx: size * Math.cos(angle), dy: size * Math.sin(angle), label: 'out' },
-                                { dx: 0 * Math.cos(angle) + (-30) * Math.sin(angle), dy: 0 * Math.sin(angle) - (-30) * Math.cos(angle), label: 'V+' },
-                                { dx: 0 * Math.cos(angle) + 30 * Math.sin(angle), dy: 0 * Math.sin(angle) - 30 * Math.cos(angle), label: 'V-' }
+                                { dx: -size * Math.cos(opAngle) + (-12) * Math.sin(opAngle), dy: -size * Math.sin(opAngle) - (-12) * Math.cos(opAngle), label: '+' },
+                                { dx: -size * Math.cos(opAngle) + 12 * Math.sin(opAngle), dy: -size * Math.sin(opAngle) - 12 * Math.cos(opAngle), label: '-' },
+                                { dx: size * Math.cos(opAngle), dy: size * Math.sin(opAngle), label: 'out' },
+                                { dx: 0 * Math.cos(opAngle) + (-30) * Math.sin(opAngle), dy: 0 * Math.sin(opAngle) - (-30) * Math.cos(opAngle), label: 'V+' },
+                                { dx: 0 * Math.cos(opAngle) + 30 * Math.sin(opAngle), dy: 0 * Math.sin(opAngle) - 30 * Math.cos(opAngle), label: 'V-' }
                             ];
                         } else {
                             points = [
-                                { dx: -size * Math.cos(angle) + (-12) * Math.sin(angle), dy: -size * Math.sin(angle) - (-12) * Math.cos(angle), label: '+' },
-                                { dx: -size * Math.cos(angle) + 12 * Math.sin(angle), dy: -size * Math.sin(angle) - 12 * Math.cos(angle), label: '-' },
-                                { dx: size * Math.cos(angle), dy: size * Math.sin(angle), label: 'out' }
+                                { dx: -size * Math.cos(opAngle) + (-12) * Math.sin(opAngle), dy: -size * Math.sin(opAngle) - (-12) * Math.cos(opAngle), label: '+' },
+                                { dx: -size * Math.cos(opAngle) + 12 * Math.sin(opAngle), dy: -size * Math.sin(opAngle) - 12 * Math.cos(opAngle), label: '-' },
+                                { dx: size * Math.cos(opAngle), dy: size * Math.sin(opAngle), label: 'out' }
                             ];
                         }
                         break;
                     case 'GND':
-                        points = [{ dx: 0 * Math.cos(angle) + (-size) * Math.sin(angle), dy: 0 * Math.sin(angle) - (-size) * Math.cos(angle), label: 'top' }];
+                        const gndAngle = comp.rotation * Math.PI / 180;
+                        points = [{ dx: 0 * Math.cos(gndAngle) + (-size) * Math.sin(gndAngle), dy: 0 * Math.sin(gndAngle) - (-size) * Math.cos(gndAngle), label: 'top' }];
                         break;
                     default:
                         points = [
-                            { dx: -size * Math.cos(angle), dy: -size * Math.sin(angle), label: 'left' },
-                            { dx: size * Math.cos(angle), dy: size * Math.sin(angle), label: 'right' }
+                            { dx: -size * Math.cos(comp.rotation * Math.PI / 180), dy: -size * Math.sin(comp.rotation * Math.PI / 180), label: 'left' },
+                            { dx: size * Math.cos(comp.rotation * Math.PI / 180), dy: size * Math.sin(comp.rotation * Math.PI / 180), label: 'right' }
                         ];
                 }
 
@@ -768,78 +722,42 @@
                 // If we get here, clicking on empty space - do nothing (no wire drawing from empty space)
             };
 
-  const handleCanvasMouseMove = (e) => {
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / zoom;
-    const y = (e.clientY - rect.top) / zoom;
+            const handleCanvasMouseMove = (e) => {
+                const rect = canvasRef.current.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / zoom;
+                const y = (e.clientY - rect.top) / zoom;
 
-    if (isDragging && selectedComponent) {
-      const newX = snapToGrid(x);
-      const newY = snapToGrid(y);
-      
-      setComponents(components.map(comp => {
-        if (comp.id === selectedComponent) {
-          return { ...comp, x: newX, y: newY };
-        }
-        return comp;
-      }));
-      
-      // Update wire positions that are connected to this component
-      setWires(wires.map(wire => {
-        const updatedWire = { ...wire };
-        if (wire.start.compId === selectedComponent || wire.end.compId === selectedComponent) {
-          // Recalculate connection points for this component
-          const movedComp = components.find(c => c.id === selectedComponent);
-          if (movedComp) {
-            const tempComp = { ...movedComp, x: newX, y: newY };
-            const points = getConnectionPoints(tempComp);
-            
-            if (wire.start.compId === selectedComponent) {
-              const matchPoint = points.find(p => 
-                Math.abs(p.x - wire.start.x) < 5 && Math.abs(p.y - wire.start.y) < 5
-              );
-              if (matchPoint) {
-                updatedWire.start = { ...wire.start, x: matchPoint.x, y: matchPoint.y };
-              }
-            }
-            
-            if (wire.end.compId === selectedComponent) {
-              const matchPoint = points.find(p => 
-                Math.abs(p.x - wire.end.x) < 5 && Math.abs(p.y - wire.end.y) < 5
-              );
-              if (matchPoint) {
-                updatedWire.end = { ...wire.end, x: matchPoint.x, y: matchPoint.y };
-              }
-            }
-          }
-        }
-        return updatedWire;
-      }));
-    }
+                if (isDragging && selectedComponent) {
+                    setComponents(components.map(comp =>
+                        comp.id === selectedComponent
+                            ? { ...comp, x: snapToGrid(x), y: snapToGrid(y) }
+                            : comp
+                    ));
+                }
 
-    if (isDrawingWire) {
-      // Magnetic snapping - check if near any connection point
-      let snappedEnd = { x, y };
-      const snapDistance = 15;
-      
-      for (const comp of components) {
-        const points = getConnectionPoints(comp);
-        for (const point of points) {
-          const dx = x - point.x;
-          const dy = y - point.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          
-          if (distance < snapDistance) {
-            snappedEnd = { x: point.x, y: point.y };
-            break;
-          }
-        }
-        if (snappedEnd.x !== x || snappedEnd.y !== y) break;
-      }
-      
-      setCurrentWireEnd(snappedEnd);
-    }
-  };
+                if (isDrawingWire) {
+                    // Magnetic snapping - check if near any connection point
+                    let snappedEnd = { x, y };
+                    const snapDistance = 15; // Magnetic range in pixels
+                    
+                    for (const comp of components) {
+                        const points = getConnectionPoints(comp);
+                        for (const point of points) {
+                            const dx = x - point.x;
+                            const dy = y - point.y;
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+                            
+                            if (distance < snapDistance) {
+                                snappedEnd = { x: point.x, y: point.y };
+                                break;
+                            }
+                        }
+                        if (snappedEnd.x !== x || snappedEnd.y !== y) break;
+                    }
+                    
+                    setCurrentWireEnd(snappedEnd);
+                }
+            };
 
             const handleCanvasMouseUp = (e) => {
                 const rect = canvasRef.current.getBoundingClientRect();
@@ -875,51 +793,15 @@
                 setIsDragging(false);
             };
 
-  const rotateComponent = () => {
-    if (selectedComponent) {
-      setComponents(components.map(comp => {
-        if (comp.id === selectedComponent) {
-          const newRotation = (comp.rotation + 90) % 360;
-          return { ...comp, rotation: newRotation };
-        }
-        return comp;
-      }));
-      
-      // Update wire positions connected to this component
-      const rotatedComp = components.find(c => c.id === selectedComponent);
-      if (rotatedComp) {
-        const newRotation = (rotatedComp.rotation + 90) % 360;
-        const tempComp = { ...rotatedComp, rotation: newRotation };
-        const newPoints = getConnectionPoints(tempComp);
-        const oldPoints = getConnectionPoints(rotatedComp);
-        
-        setWires(wires.map(wire => {
-          let updatedWire = { ...wire };
-          
-          if (wire.start.compId === selectedComponent) {
-            // Find which old point this was connected to and update to new rotated position
-            const oldIndex = oldPoints.findIndex(p => 
-              Math.abs(p.x - wire.start.x) < 1 && Math.abs(p.y - wire.start.y) < 1
-            );
-            if (oldIndex >= 0 && newPoints[oldIndex]) {
-              updatedWire.start = { ...wire.start, x: newPoints[oldIndex].x, y: newPoints[oldIndex].y };
-            }
-          }
-          
-          if (wire.end.compId === selectedComponent) {
-            const oldIndex = oldPoints.findIndex(p => 
-              Math.abs(p.x - wire.end.x) < 1 && Math.abs(p.y - wire.end.y) < 1
-            );
-            if (oldIndex >= 0 && newPoints[oldIndex]) {
-              updatedWire.end = { ...wire.end, x: newPoints[oldIndex].x, y: newPoints[oldIndex].y };
-            }
-          }
-          
-          return updatedWire;
-        }));
-      }
-    }
-  };
+            const rotateComponent = () => {
+                if (selectedComponent) {
+                    setComponents(components.map(comp =>
+                        comp.id === selectedComponent
+                            ? { ...comp, rotation: (comp.rotation + 90) % 360 }
+                            : comp
+                    ));
+                }
+            };
 
             const deleteSelected = () => {
                 if (selectedComponent) {
