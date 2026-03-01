@@ -599,6 +599,55 @@
                 ctx.restore();
             };
 
+            const getRelativeConnectionPoints = (type) => {
+                const size = 40;
+                let points = [];
+
+                switch (type) {
+                    case 'Q':
+                        points = [
+                            { dx: -size, dy: 0, label: 'B' },
+                            { dx: 8, dy: -size, label: 'C' },
+                            { dx: 8, dy: size, label: 'E' }
+                        ];
+                        break;
+                    case 'T':
+                        points = [
+                            { dx: -15, dy: -size, label: 'L1-top' },
+                            { dx: -15, dy: size, label: 'L1-bot' },
+                            { dx: 15, dy: -size, label: 'L2-top' },
+                            { dx: 15, dy: size, label: 'L2-bot' }
+                        ];
+                        break;
+                    case 'OPP':
+                        points = [
+                            { dx: -size, dy: -12, label: '+' },
+                            { dx: -size, dy: 12, label: '-' },
+                            { dx: size, dy: 0, label: 'out' },
+                            { dx: 0, dy: -30, label: 'V+' },
+                            { dx: 0, dy: 30, label: 'V-' }
+                        ];
+                        break;
+                    case 'OP':
+                        points = [
+                            { dx: -size, dy: -12, label: '+' },
+                            { dx: -size, dy: 12, label: '-' },
+                            { dx: size, dy: 0, label: 'out' }
+                        ];
+                        break;
+                    case 'GND':
+                        points = [{ dx: 0, dy: -size, label: 'top' }];
+                        break;
+                    default:
+                        points = [
+                            { dx: -size, dy: 0, label: 'left' },
+                            { dx: size, dy: 0, label: 'right' }
+                        ];
+                }
+
+                return points;
+            };
+
             const getConnectionPoints = (comp) => {
                 const size = 40;
                 const angle = comp.rotation * Math.PI / 180;
