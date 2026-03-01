@@ -604,7 +604,7 @@
                         for (const point of points) {
                             const dx = x - point.x;
                             const dy = y - point.y;
-                            if (Math.sqrt(dx * dx + dy * dy) < 8) {
+                            if (Math.sqrt(dx * dx + dy * dy) < 15) {
                                 const nodeName = prompt('Enter node name (e.g., A, B, Vin, Vout):', nodeNames[`${point.x},${point.y}`] || '');
                                 if (nodeName !== null) {
                                     if (nodeName.trim() === '') {
@@ -641,23 +641,23 @@
 
                 setSelectedComponent(null);
 
+                // ONLY allow wire drawing from component pins
+                const snapDistance = 15;
                 for (const comp of components) {
                     const points = getConnectionPoints(comp);
                     for (const point of points) {
                         const dx = x - point.x;
                         const dy = y - point.y;
-                        if (Math.sqrt(dx * dx + dy * dy) < 8) {
+                        if (Math.sqrt(dx * dx + dy * dy) < snapDistance) {
                             setIsDrawingWire(true);
                             setWireStart({ x: point.x, y: point.y, compId: comp.id });
-                            setCurrentWireEnd({ x, y });
+                            setCurrentWireEnd({ x: point.x, y: point.y });
                             return;
                         }
                     }
                 }
 
-                setIsDrawingWire(true);
-                setWireStart({ x: snapToGrid(x), y: snapToGrid(y), compId: null });
-                setCurrentWireEnd({ x, y });
+                // If we get here, clicking on empty space - do nothing (no wire drawing from empty space)
             };
 
             const handleCanvasMouseMove = (e) => {
