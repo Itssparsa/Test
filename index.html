@@ -161,6 +161,87 @@
                 }
             };
 
+            // ─── FIXED: getConnectionPoints returns local (unrotated) dx/dy ──────────────
+            // We compute the world x/y by applying rotation ourselves so the returned
+            // point.x / point.y are always correct world coordinates regardless of rotation.
+            const getConnectionPoints = (comp) => {
+                const size = 40;
+                const angle = comp.rotation * Math.PI / 180;
+                const cos = Math.cos(angle);
+                const sin = Math.sin(angle);
+
+                // Helper: rotate a local offset (lx, ly) into world-space offset
+                const rot = (lx, ly) => ({
+                    dx: lx * cos - ly * sin,
+                    dy: lx * sin + ly * cos
+                });
+
+                let localPoints = [];
+
+                switch (comp.type) {
+                    case 'Q':
+                        localPoints = [
+                            { lx: -size, ly: 0,     label: 'B' },
+                            { lx: 8,    ly: -size,  label: 'C' },
+                            { lx: 8,    ly: size,   label: 'E' }
+                        ];
+                        break;
+
+                    case 'T':
+                        localPoints = [
+                            { lx: -15, ly: -size, label: 'L1-top' },
+                            { lx: -15, ly:  size, label: 'L1-bot' },
+                            { lx:  15, ly: -size, label: 'L2-top' },
+                            { lx:  15, ly:  size, label: 'L2-bot' }
+                        ];
+                        break;
+
+                    case 'OP':
+                        localPoints = [
+                            { lx: -size, ly: -12, label: '+' },
+                            { lx: -size, ly:  12, label: '-' },
+                            { lx:  size, ly:   0, label: 'out' }
+                        ];
+                        break;
+
+                    case 'OPP':
+                        localPoints = [
+                            { lx: -size, ly: -12, label: '+' },
+                            { lx: -size, ly:  12, label: '-' },
+                            { lx:  size, ly:   0, label: 'out' },
+                            { lx:  0,    ly: -30, label: 'V+' },
+                            { lx:  0,    ly:  30, label: 'V-' }
+                        ];
+                        break;
+
+                    case 'GND':
+                        localPoints = [
+                            { lx: 0, ly: -size, label: 'top' }
+                        ];
+                        break;
+
+                    default:
+                        localPoints = [
+                            { lx: -size, ly: 0, label: 'left' },
+                            { lx:  size, ly: 0, label: 'right' }
+                        ];
+                }
+
+                return localPoints.map(p => {
+                    const { dx, dy } = rot(p.lx, p.ly);
+                    return {
+                        x:  comp.x + dx,
+                        y:  comp.y + dy,
+                        dx, // world-space offset (used for drawing inside rotated ctx would be wrong, so we use x/y below)
+                        dy,
+                        lx: p.lx, // local (unrotated) offset — used when drawing inside rotated canvas context
+                        ly: p.ly,
+                        label: p.label
+                    };
+                });
+            };
+            // ─────────────────────────────────────────────────────────────────────────────
+
             const drawComponent = (ctx, comp, values) => {
                 ctx.save();
                 ctx.translate(comp.x, comp.y);
@@ -342,7 +423,7 @@
                         ctx.stroke();
                         break;
 
-                    case 'E': // Dependent Voltage Source - Diamond with + and -
+                    case 'E':
                         ctx.beginPath();
                         ctx.moveTo(-20, 0);
                         ctx.lineTo(0, -20);
@@ -364,7 +445,7 @@
                         ctx.stroke();
                         break;
 
-                    case 'F': // Dependent Current Source - Diamond with arrow
+                    case 'F':
                         ctx.beginPath();
                         ctx.moveTo(-20, 0);
                         ctx.lineTo(0, -20);
@@ -527,16 +608,20 @@
                         break;
                 }
 
+                // ── FIX: Draw red dots using LOCAL (unrotated) coordinates ──────────────
+                // We are still inside ctx.rotate(), so use lx/ly (local offsets) not dx/dy.
                 const points = getConnectionPoints(comp);
                 ctx.fillStyle = '#ff0000';
                 points.forEach(point => {
                     ctx.beginPath();
-                    ctx.arc(point.dx, point.dy, 3, 0, 2 * Math.PI);
+                    ctx.arc(point.lx, point.ly, 3, 0, 2 * Math.PI);
                     ctx.fill();
                 });
+                // ─────────────────────────────────────────────────────────────────────────
 
                 ctx.restore();
 
+                // Draw labels (second pass, separate save/restore)
                 ctx.save();
                 ctx.translate(comp.x, comp.y);
                 ctx.rotate((comp.rotation * Math.PI) / 180);
@@ -599,67 +684,11 @@
                 ctx.restore();
             };
 
-            const getConnectionPoints = (comp) => {
-                const size = 40;
-                let points = [];
-
-                switch (comp.type) {
-                    case 'Q':
-                        const angle = comp.rotation * Math.PI / 180;
-                        points = [
-                            { dx: -size * Math.cos(angle), dy: -size * Math.sin(angle), label: 'B' },
-                            { dx: 8 * Math.cos(angle) + (-size) * Math.sin(angle), dy: 8 * Math.sin(angle) - (-size) * Math.cos(angle), label: 'C' },
-                            { dx: 8 * Math.cos(angle) + size * Math.sin(angle), dy: 8 * Math.sin(angle) - size * Math.cos(angle), label: 'E' }
-                        ];
-                        break;
-                    case 'T':
-                        const tAngle = comp.rotation * Math.PI / 180;
-                        points = [
-                            { dx: -15 * Math.cos(tAngle) + (-size) * Math.sin(tAngle), dy: -15 * Math.sin(tAngle) - (-size) * Math.cos(tAngle), label: 'L1-top' },
-                            { dx: -15 * Math.cos(tAngle) + size * Math.sin(tAngle), dy: -15 * Math.sin(tAngle) - size * Math.cos(tAngle), label: 'L1-bot' },
-                            { dx: 15 * Math.cos(tAngle) + (-size) * Math.sin(tAngle), dy: 15 * Math.sin(tAngle) - (-size) * Math.cos(tAngle), label: 'L2-top' },
-                            { dx: 15 * Math.cos(tAngle) + size * Math.sin(tAngle), dy: 15 * Math.sin(tAngle) - size * Math.cos(tAngle), label: 'L2-bot' }
-                        ];
-                        break;
-                    case 'OPP':
-                    case 'OP':
-                        const opAngle = comp.rotation * Math.PI / 180;
-                        if (comp.type === 'OPP') {
-                            points = [
-                                { dx: -size * Math.cos(opAngle) + (-12) * Math.sin(opAngle), dy: -size * Math.sin(opAngle) - (-12) * Math.cos(opAngle), label: '+' },
-                                { dx: -size * Math.cos(opAngle) + 12 * Math.sin(opAngle), dy: -size * Math.sin(opAngle) - 12 * Math.cos(opAngle), label: '-' },
-                                { dx: size * Math.cos(opAngle), dy: size * Math.sin(opAngle), label: 'out' },
-                                { dx: 0 * Math.cos(opAngle) + (-30) * Math.sin(opAngle), dy: 0 * Math.sin(opAngle) - (-30) * Math.cos(opAngle), label: 'V+' },
-                                { dx: 0 * Math.cos(opAngle) + 30 * Math.sin(opAngle), dy: 0 * Math.sin(opAngle) - 30 * Math.cos(opAngle), label: 'V-' }
-                            ];
-                        } else {
-                            points = [
-                                { dx: -size * Math.cos(opAngle) + (-12) * Math.sin(opAngle), dy: -size * Math.sin(opAngle) - (-12) * Math.cos(opAngle), label: '+' },
-                                { dx: -size * Math.cos(opAngle) + 12 * Math.sin(opAngle), dy: -size * Math.sin(opAngle) - 12 * Math.cos(opAngle), label: '-' },
-                                { dx: size * Math.cos(opAngle), dy: size * Math.sin(opAngle), label: 'out' }
-                            ];
-                        }
-                        break;
-                    case 'GND':
-                        const gndAngle = comp.rotation * Math.PI / 180;
-                        points = [{ dx: 0 * Math.cos(gndAngle) + (-size) * Math.sin(gndAngle), dy: 0 * Math.sin(gndAngle) - (-size) * Math.cos(gndAngle), label: 'top' }];
-                        break;
-                    default:
-                        points = [
-                            { dx: -size * Math.cos(comp.rotation * Math.PI / 180), dy: -size * Math.sin(comp.rotation * Math.PI / 180), label: 'left' },
-                            { dx: size * Math.cos(comp.rotation * Math.PI / 180), dy: size * Math.sin(comp.rotation * Math.PI / 180), label: 'right' }
-                        ];
-                }
-
-                return points.map(p => ({ x: comp.x + p.dx, y: comp.y + p.dy, dx: p.dx, dy: p.dy, label: p.label }));
-            };
-
             const handleCanvasMouseDown = (e) => {
                 const rect = canvasRef.current.getBoundingClientRect();
                 const x = (e.clientX - rect.left) / zoom;
                 const y = (e.clientY - rect.top) / zoom;
 
-                // If in naming mode, name the clicked node
                 if (isNamingNode) {
                     for (const comp of components) {
                         const points = getConnectionPoints(comp);
@@ -703,7 +732,6 @@
 
                 setSelectedComponent(null);
 
-                // ONLY allow wire drawing from component pins
                 const snapDistance = 15;
                 for (const comp of components) {
                     const points = getConnectionPoints(comp);
@@ -718,8 +746,6 @@
                         }
                     }
                 }
-
-                // If we get here, clicking on empty space - do nothing (no wire drawing from empty space)
             };
 
             const handleCanvasMouseMove = (e) => {
@@ -736,9 +762,8 @@
                 }
 
                 if (isDrawingWire) {
-                    // Magnetic snapping - check if near any connection point
                     let snappedEnd = { x, y };
-                    const snapDistance = 15; // Magnetic range in pixels
+                    const snapDistance = 15;
                     
                     for (const comp of components) {
                         const points = getConnectionPoints(comp);
@@ -768,7 +793,6 @@
                     let endPoint = { x: snapToGrid(x), y: snapToGrid(y), compId: null };
                     const snapDistance = 15;
 
-                    // Magnetic snapping for wire end
                     for (const comp of components) {
                         const points = getConnectionPoints(comp);
                         for (const point of points) {
